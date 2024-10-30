@@ -30,15 +30,11 @@ class TuramozgalomSerializer(serializers.ModelSerializer):
 
 
 
-class StampSerializer(serializers.Serializer):
-    stampPointId = serializers.CharField()
-    fulfillmentType = serializers.CharField()
-    fulfillmentDate = serializers.IntegerField()
 
-class ChallengesSerializer(serializers.Serializer):
-    stamps = StampSerializer(many=True)
-    language = serializers.CharField(default="hu")
-    bookletWhichBlue = serializers.CharField()
+# class ChallengesSerializer(serializers.Serializer):
+#     stamps = StampSerializer(many=True)
+#     language = serializers.CharField(default="hu")
+#     bookletWhichBlue = serializers.CharField()
 
 
 class BHDSerializer(serializers.Serializer):
@@ -47,17 +43,13 @@ class BHDSerializer(serializers.Serializer):
     stamping_date = serializers.SerializerMethodField()
 
     def get_stamping_date(self, obj):
-        if hasattr(obj, 'stampType') and obj.stampType == "digistamp":
-            if isinstance(obj.stamping_date, datetime):
-                return obj.stamping_date.strftime("%Y-%m-%d %H:%M:%S")
-            return obj.stamping_date
 
-        elif hasattr(obj, 'stampType') and obj.stampType == "register":
-            if isinstance(obj.stamping_date, datetime):
-                return obj.stamping_date.date() 
-            return obj.stamping_date
+        if obj.stamp_type == "digistamp":
+            return obj.stamping_date.strftime("%Y-%m-%d %H:%M:%S")
 
-        return obj.stamping_date
+        elif obj.stamp_type == "register":
+            return obj.stamping_date.strftime("%Y-%m-%d") 
+
     
     def get_bh(self,obj):
         serializer = BHPointSerializer(obj.bh)
@@ -70,17 +62,11 @@ class BHSzDSerializer(serializers.Serializer):
     stamping_date = serializers.SerializerMethodField()
 
     def get_stamping_date(self, obj):
-        if hasattr(obj, 'stampType') and obj.stampType == "digistamp":
-            if isinstance(obj.stamping_date, datetime):
-                return obj.stamping_date.strftime("%Y-%m-%d %H:%M:%S")
-            return obj.stamping_date
+        if obj.stamp_type == "digistamp":
+            return obj.stamping_date.strftime("%Y-%m-%d %H:%M:%S")
 
-        elif hasattr(obj, 'stampType') and obj.stampType == "register":
-            if isinstance(obj.stamping_date, datetime):
-                return obj.stamping_date.date() 
-            return obj.stamping_date
-
-        return obj.stamping_date
+        elif obj.stamp_type == "register":
+            return obj.stamping_date.strftime("%Y-%m-%d") 
 
 
     def get_stamp_type(self,obj):
@@ -89,3 +75,5 @@ class BHSzDSerializer(serializers.Serializer):
     def get_bh_szakasz(self,obj):
         serializer = BHSzakaszSerializer(obj.bh_szakasz)
         return serializer.data
+    
+

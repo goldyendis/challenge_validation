@@ -12,6 +12,7 @@ class StampType(Enum):
     Digital = "digistamp"
     Kezi = "register"
 
+
 @dataclass
 class JSONBH(ABC):
     mtsz_id: str

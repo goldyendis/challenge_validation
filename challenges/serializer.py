@@ -16,10 +16,9 @@ class BHPointDetailSerializer(serializers.ModelSerializer):
 class BHSzakaszSerializer(serializers.ModelSerializer):
     class Meta:
         model = BHSzakasz
-        fields = ["objectid","sorszam","nagyszakasz_id","bhszakasz_id",
-			"kezdopont", "vegpont","szakasznev","tav","szintemelkedes",
-			"szintcsokkenes","szintido_oda","szintido_vissza","gykt_tajegyseg",
-			"okk_mozgalom","start_date","end_date",
+        fields = ["objectid","bhszakasz_id",
+			"kezdopont", "vegpont",
+			"start_date","end_date",
 			"kezdopont_bh_id",
 			"vegpont_bh_id"]
 
@@ -62,4 +61,31 @@ class BHDSerializer(serializers.Serializer):
     
     def get_bh(self,obj):
         serializer = BHPointSerializer(obj.bh)
+        return serializer.data
+    
+
+class BHSzDSerializer(serializers.Serializer):
+    bh_szakasz = serializers.SerializerMethodField()
+    stamp_type = serializers.SerializerMethodField()
+    stamping_date = serializers.SerializerMethodField()
+
+    def get_stamping_date(self, obj):
+        if hasattr(obj, 'stampType') and obj.stampType == "digistamp":
+            if isinstance(obj.stamping_date, datetime):
+                return obj.stamping_date.strftime("%Y-%m-%d %H:%M:%S")
+            return obj.stamping_date
+
+        elif hasattr(obj, 'stampType') and obj.stampType == "register":
+            if isinstance(obj.stamping_date, datetime):
+                return obj.stamping_date.date() 
+            return obj.stamping_date
+
+        return obj.stamping_date
+
+
+    def get_stamp_type(self,obj):
+        return obj.stamp_type.value
+
+    def get_bh_szakasz(self,obj):
+        serializer = BHSzakaszSerializer(obj.bh_szakasz)
         return serializer.data

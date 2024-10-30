@@ -2,9 +2,7 @@ from typing import List
 from requests import Response
 from rest_framework.views import APIView
 from challenges.challenge_validation import ChallengeValidation
-from challenges.enums import JSONBH, BookletTypes
-from challenges.models import BHSzakasz
-from challenges.serializer import BHDSerializer, BHPointSerializer, BHSzakaszSerializer
+from challenges.serializer import BHDSerializer, BHSzDSerializer, BHSzakaszSerializer
 from router.exceptions import UnauthorizedException
 from router.views import verify_api_key
 from rest_framework.renderers import JSONRenderer
@@ -24,21 +22,17 @@ class Challenges(APIView):
 
     def post(self, request, *args, **kwargs):
         verify_api_key(request.headers.get('X-API-KEY'), request.data.get("language","hu"))
-        # stamps: List[JSONBH] = [
-        #     JSONBH(
-        #         mtsz_id=stamp.get('stampPointId'),
-        #         stampType=stamp.get('fulfillmentType'),
-        #         timestamp=stamp.get('fulfillmentDate')
-        #     )
-        #     for stamp in request.data.get('stamps', [])
-        # ]
-        # mozgalom:BookletTypes = request.data.get('bookletWhichBlue',None)
 
         challenge = ChallengeValidation(request)
-        serializer = BHDSerializer(challenge.BHD_list,many=True)
+        bhd_serializer = BHDSerializer(challenge.BHD_list,many=True)
+        bhszd_serializer = BHSzDSerializer(challenge.validated_bhszd, many=True)
+
         return Response({
             'status': 'success',
-            # 'bh_szakaszok': bh_szakaszs,
-            'testing': serializer.data 
+            'mozgalom':challenge.mozgalom,
+            'mozgalom_kezdoBH': challenge.kezdopont,
+            'mozgalom_vegpontBH': challenge.vegpont,
+            'valid_bhszd': bhszd_serializer.data,
+            'sorted_BHD': bhd_serializer.data,
         }, status=status.HTTP_200_OK)
     

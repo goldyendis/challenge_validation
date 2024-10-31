@@ -15,7 +15,6 @@ class ChallengeValidation:
         self.kezdopont, self.vegpont = BH.get_mozgalom_start_end_BH(self.BHD_list, self.mozgalom)
         self.sort_BHDs()
         self.validate_bhszd_sections()
-        print(self.BHD_list)
 
     def create_BHD_objects(self, request)->BHDList[BHD]:
         '''Converts the request to a list of BHD objects'''
@@ -61,7 +60,6 @@ class ChallengeValidation:
                     if bh_szakasz:
                         if self.velocity_checked(bh_szakasz.tav, self.BHD_list[a].stamping_date, self.BHD_list[b].stamping_date):
                             found = True
-                            print(self.BHD_list[a].stamp_type, self.BHD_list[b].stamp_type)
                             bhszd_stamp_type:StampType = (
                                 StampType.Kezi if any(stamp.stamp_type == StampType.Kezi.value for stamp in [self.BHD_list[a], self.BHD_list[b]])
                                 else StampType.Digital

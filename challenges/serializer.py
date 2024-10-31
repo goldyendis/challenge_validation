@@ -1,11 +1,13 @@
-from datetime import datetime
+import re
+from pyproj import Transformer
 from rest_framework import serializers
 from .models import BH, BHSzakasz, Turamozgalom
+from django.db import connections
 
 class BHPointSerializer(serializers.ModelSerializer):
     class Meta:
         model = BH
-        fields = ['bh_nev','mtsz_id','bh_id','objectid','start_date','end_date']
+        fields = ['bh_nev','mtsz_id','bh_id','objectid','start_date','end_date','lat','lon']
 
 class BHPointDetailSerializer(serializers.ModelSerializer):
     class Meta:
@@ -14,15 +16,45 @@ class BHPointDetailSerializer(serializers.ModelSerializer):
 
 
 class BHSzakaszSerializer(serializers.ModelSerializer):
+    shape = serializers.SerializerMethodField()
     class Meta:
         model = BHSzakasz
         fields = ["objectid","bhszakasz_id",
 			"kezdopont", "vegpont",
 			"start_date","end_date",
 			"kezdopont_bh_id",
-			"vegpont_bh_id"]
+			"vegpont_bh_id","shape"]
 
+    def get_shape(self, obj):
+        query = """
+            SELECT sde.ST_AsText(shape) 
+            FROM kektura.bhszakasz 
+            WHERE objectid = %s
+        """
+        with connections['bh'].cursor() as cursor:
+            cursor.execute(query, [obj.objectid])
+            result = cursor.fetchone()
+        
+        if result and result[0]:
+            wkt = result[0]
+            geojson = self.linestring_z_to_geojson(wkt)
+            return geojson
+        return None
+    
+    def linestring_z_to_geojson(self, wkt):
+        transformer = Transformer.from_crs("EPSG:102100", "EPSG:4326", always_xy=True)  
 
+        coord_text = re.search(r"LINESTRING Z \((.*)\)", wkt).group(1)
+        coords = [
+            list(transformer.transform(x, y)) + [z] 
+            for x, y, z in (map(float, point.split()) for point in coord_text.split(", "))
+        ]
+        
+        geojson = {
+            "type": "LineString",
+            "coordinates": coords
+        }
+        return geojson
 class TuramozgalomSerializer(serializers.ModelSerializer):
     class Meta:
         model = Turamozgalom

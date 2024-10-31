@@ -53,13 +53,9 @@ class ChallengeValidation:
             b = a + 1
             
             while b < n and not (found or failed):
-                print(self.BHD_list[a].bh.bh_nev)
-                print(self.BHD_list[b].bh.bh_nev)
-                # Check if the next stamp is within the 1-day range
                 if self.BHD_list[a].stamping_date.date() + timedelta(days=1) < self.BHD_list[b].stamping_date.date():
                     failed = True
                 else:
-                    # Attempt to locate a BHSzakasz for the segment
                     section_date:datetime = min(self.BHD_list[a].stamping_date, self.BHD_list[b].stamping_date)
                     bh_szakasz = self.find_section(self.BHD_list[a], self.BHD_list[b],section_date)
                     if bh_szakasz:
@@ -75,17 +71,14 @@ class ChallengeValidation:
                             else:
                                 failed = True
                         else:
-                            #Az egyik legalább Kezi pecsételés
-                            #HA egy nap nem tudja kétszer regisztrálni ugyanazt a BH_ID-t akkor jó...
-                            bhszd = BHSzD(bh_szakasz,section_date,StampType.Kezi,self.mozgalom)
-                            self.validated_bhszd.append(bhszd)
-                            found = True
+                            if self.BHD_list[b].bh.bh_id != self.BHD_list[b-1].bh.bh_id:
+                                bhszd = BHSzD(bh_szakasz,section_date,StampType.Kezi,self.mozgalom)
+                                self.validated_bhszd.append(bhszd)
                     else:
                         failed = True
-                        # Additional handling for sequential Kezi stamps
-                        if failed and self.BHD_list[b].stamp_type == StampType.Kezi:
+                        if failed and self.BHD_list[b].stamp_type == "register":
                             if (b + 1 < n and 
-                                self.BHD_list[b + 1].stamp_type == StampType.Kezi and 
+                                self.BHD_list[b + 1].stamp_type == "register" and 
                                 self.BHD_list[b].stamping_date.date() == self.BHD_list[b + 1].stamping_date.date()):
                                 failed = False
                                 section_date:datetime = min(self.BHD_list[a].stamping_date, self.BHD_list[b+1].stamping_date)
@@ -93,6 +86,24 @@ class ChallengeValidation:
                                 if bh_szakasz:
                                     bhszd = BHSzD(bh_szakasz,section_date,StampType.Kezi,self.mozgalom)
                                     self.validated_bhszd.append(bhszd)
+                            # A Kézi pecsétek, amik a sorbarendezésnél a nap végén vannak, azok után az első digitálisat is meg kell nézni a következő napon, mert az érvényes lehet...
+                            if (b + 1 < n and 
+                                    self.BHD_list[b + 1].stamp_type == "digistamp"):
+                                failed = False
+                                section_date:datetime = min(self.BHD_list[a].stamping_date, self.BHD_list[b+1].stamping_date)
+                                bh_szakasz = self.find_section(self.BHD_list[a], self.BHD_list[b+1],section_date)
+                                if bh_szakasz:
+                                    bhszd_stamp_type:StampType = (
+                                        StampType.Kezi if any(stamp.stamp_type == StampType.Kezi.value for stamp in [self.BHD_list[a], self.BHD_list[b+1]])
+                                        else StampType.Digital
+                                    )
+                                    if bhszd_stamp_type.value == "digistamp":
+                                        if self.velocity_checked(bh_szakasz.tav, self.BHD_list[a].stamping_date, self.BHD_list[b+1].stamping_date):
+                                            found = True
+                                            bhszd = BHSzD(bh_szakasz,section_date,bhszd_stamp_type,self.mozgalom)
+                                            self.validated_bhszd.append(bhszd)
+                                        else:
+                                            failed = True
                 b += 1
 
     def find_section(self, start_BHD:BHD, end_BHD:BHD,section_date:datetime)->BHSzD:

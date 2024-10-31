@@ -60,15 +60,6 @@ class TuramozgalomSerializer(serializers.ModelSerializer):
         model = Turamozgalom
         fields = '__all__'
 
-
-
-
-# class ChallengesSerializer(serializers.Serializer):
-#     stamps = StampSerializer(many=True)
-#     language = serializers.CharField(default="hu")
-#     bookletWhichBlue = serializers.CharField()
-
-
 class BHDSerializer(serializers.Serializer):
     bh = serializers.SerializerMethodField()
     stamp_type = serializers.CharField()
@@ -94,10 +85,10 @@ class BHSzDSerializer(serializers.Serializer):
     stamping_date = serializers.SerializerMethodField()
 
     def get_stamping_date(self, obj):
-        if obj.stamp_type == "digistamp":
+        if obj.stamp_type.value == "digistamp":
             return obj.stamping_date.strftime("%Y-%m-%d %H:%M:%S")
 
-        elif obj.stamp_type == "register":
+        elif obj.stamp_type.value == "register":
             return obj.stamping_date.strftime("%Y-%m-%d") 
 
 

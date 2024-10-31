@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta
 from typing import Dict, List, Set, Tuple
 
+from challenges.bhszd_linked_list import BHSZDLinkedList
 from challenges.enums import BookletTypes, StampType
 from challenges.models import BHD, BH, BHDList, BHSzD, BHSzakasz
 from django.db.models import Q
@@ -15,6 +16,8 @@ class ChallengeValidation:
         self.kezdopont, self.vegpont = BH.get_mozgalom_start_end_BH(self.BHD_list, self.mozgalom)
         self.sort_BHDs()
         self.validate_bhszd_sections()
+        print(self.validated_bhszd)
+        self.bhsz_linked_list=BHSZDLinkedList(self.validate_bhszd_sections).create_graph()
 
     def create_BHD_objects(self, request)->BHDList[BHD]:
         '''Converts the request to a list of BHD objects'''
@@ -35,7 +38,7 @@ class ChallengeValidation:
         return timestamp
 
     def sort_BHDs(self):
-        '''BHD list sorter. First with date, then StampType and lastly BH_ID'''
+        '''BHD list sorter. First with date, then StampType, then timestamp, and lastly BH_ID'''
         def sort_key(bhd:BHD):
             type_order = 0 if bhd.stamp_type == "digistamp" else 1
             return (bhd.stamping_date.date(), type_order, bhd.stamping_date,bhd.bh.bh_id)
@@ -50,35 +53,45 @@ class ChallengeValidation:
             b = a + 1
             
             while b < n and not (found or failed):
-                # Check if within +1 day difference
-                if self.BHD_list[a].stamping_date + timedelta(days=1) < self.BHD_list[b].stamping_date:
+                # Check if the next stamp is within the 1-day range
+                print(self.BHD_list[a].bh.bh_nev)
+                print(self.BHD_list[b].bh.bh_nev)
+                if self.BHD_list[a].stamping_date.date() + timedelta(days=1) < self.BHD_list[b].stamping_date.date():
                     failed = True
                 else:
-                    # Try finding a valid BHSzakasz
+                    # Attempt to locate a BHSzakasz for the segment
                     section_date:datetime = min(self.BHD_list[a].stamping_date, self.BHD_list[b].stamping_date)
                     bh_szakasz = self.find_section(self.BHD_list[a], self.BHD_list[b],section_date)
                     if bh_szakasz:
-                        if self.velocity_checked(bh_szakasz.tav, self.BHD_list[a].stamping_date, self.BHD_list[b].stamping_date):
-                            found = True
-                            bhszd_stamp_type:StampType = (
-                                StampType.Kezi if any(stamp.stamp_type == StampType.Kezi.value for stamp in [self.BHD_list[a], self.BHD_list[b]])
-                                else StampType.Digital
-                            )
-                            bhszd = BHSzD(bh_szakasz,section_date,bhszd_stamp_type,self.mozgalom)
-                            self.validated_bhszd.append(bhszd)
+                        print(bh_szakasz)
+                        bhszd_stamp_type:StampType = (
+                            StampType.Kezi if any(stamp.stamp_type == StampType.Kezi.value for stamp in [self.BHD_list[a], self.BHD_list[b]])
+                            else StampType.Digital
+                        )
+                        if bhszd_stamp_type.value == "digistamp":
+                            if self.velocity_checked(bh_szakasz.tav, self.BHD_list[a].stamping_date, self.BHD_list[b].stamping_date):
+                                found = True
+                                bhszd = BHSzD(bh_szakasz,section_date,StampType.Digital,self.mozgalom)
+                                self.validated_bhszd.append(bhszd)
+                            else:
+                                failed = True
                         else:
-                            failed = True
-
-                if failed and self.BHD_list[b].stamp_type == StampType.Kezi:
-                    if (b + 1 < n and 
-                        self.BHD_list[b + 1].stamp_type == StampType.Kezi and 
-                        self.BHD_list[b].stamping_date.date() == self.BHD_list[b + 1].stamping_date.date()):
-                        failed = False
-                        section_date:datetime = min(self.BHD_list[a].stamping_date, self.BHD_list[b+1].stamping_date)
-                        bh_szakasz = self.find_section(self.BHD_list[a], self.BHD_list[b+1],section_date)
-                        if bh_szakasz:
+                            #Az egyik legalább Kezi pecsételés
+                            #HA egy nap nem tudja kétszer regisztrálni ugyanazt a BH_ID-t akkor jó...
                             bhszd = BHSzD(bh_szakasz,section_date,StampType.Kezi,self.mozgalom)
                             self.validated_bhszd.append(bhszd)
+                            found = True
+                    # Additional handling for sequential Kezi stamps
+                    if failed and self.BHD_list[b].stamp_type == StampType.Kezi:
+                        if (b + 1 < n and 
+                            self.BHD_list[b + 1].stamp_type == StampType.Kezi and 
+                            self.BHD_list[b].stamping_date.date() == self.BHD_list[b + 1].stamping_date.date()):
+                            failed = False
+                            section_date:datetime = min(self.BHD_list[a].stamping_date, self.BHD_list[b+1].stamping_date)
+                            bh_szakasz = self.find_section(self.BHD_list[a], self.BHD_list[b+1],section_date)
+                            if bh_szakasz:
+                                bhszd = BHSzD(bh_szakasz,section_date,StampType.Kezi,self.mozgalom)
+                                self.validated_bhszd.append(bhszd)
                 b += 1
 
     def find_section(self, start_BHD:BHD, end_BHD:BHD,section_date:datetime)->BHSzD:

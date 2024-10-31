@@ -39,7 +39,7 @@ class ChallengeValidation:
         '''BHD list sorter. First with date, then StampType and lastly BH_ID'''
         def sort_key(bhd:BHD):
             type_order = 0 if bhd.stamp_type == "digistamp" else 1
-            return (bhd.stamping_date.date(), type_order, bhd.bh.bh_id)
+            return (bhd.stamping_date.date(), type_order, bhd.stamping_date,bhd.bh.bh_id)
 
         self.BHD_list.sort(key=sort_key)
 

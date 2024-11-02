@@ -158,7 +158,7 @@ class BHSzakasz(models.Model):
     
 
 class BHSzD:
-    def __init__(self, bh_szakasz:BHSzakasz, validation_time:datetime, stamp_type: StampType, mozgalom: BookletTypes ) -> None:
+    def __init__(self, bh_szakasz:BHSzakasz, validation_time:datetime=None, stamp_type: StampType=None, mozgalom: BookletTypes=None ) -> None:
         self.bh_szakasz:BHSzakasz = bh_szakasz
         self.stamping_date :datetime = validation_time
         self.stamp_type:StampType = stamp_type

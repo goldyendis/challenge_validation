@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta
 from typing import Dict, List, Set, Tuple
 
-from challenges.bhszd_linked_list import BHSZDLinkedList
+from challenges.graph import NodeGraph
 from challenges.enums import BookletTypes, StampType
 from challenges.models import BHD, BH, BHDList, BHSzD, BHSzakasz
 from django.db.models import Q
@@ -17,7 +17,7 @@ class ChallengeValidation:
         self.sort_BHDs()
         self.validate_bhszd_sections()
         print(self.validated_bhszd)
-        self.bhsz_linked_list=BHSZDLinkedList(self.validate_bhszd_sections).create_graph()
+        self.graph_image =NodeGraph(self.kezdopont,self.vegpont,self.validated_bhszd).create_graph()
 
     def create_BHD_objects(self, request)->BHDList[BHD]:
         '''Converts the request to a list of BHD objects'''

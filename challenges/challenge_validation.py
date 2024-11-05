@@ -16,8 +16,9 @@ class ChallengeValidation:
         self.kezdopont, self.vegpont = BH.get_mozgalom_start_end_BH(self.BHD_list, self.mozgalom)
         self.sort_BHDs()
         self.validate_bhszd_sections()
-        print(self.validated_bhszd)
-        self.graph_image =NodeGraph(self.kezdopont,self.vegpont,self.validated_bhszd).create_graph()
+        self.graph_image = None
+        if len(self.validated_bhszd)>1:
+            self.graph_image =NodeGraph(self.kezdopont,self.vegpont,self.validated_bhszd,self.mozgalom).create_graph()
 
     def create_BHD_objects(self, request)->BHDList[BHD]:
         '''Converts the request to a list of BHD objects'''

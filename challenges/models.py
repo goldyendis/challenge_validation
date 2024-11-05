@@ -141,6 +141,12 @@ class BHSzakasz(models.Model):
         managed = False  
 
     @staticmethod
+    def create_null_szakasz(kezdopont_bh_id,vegpont_bh_id):
+        bhszakasz = BHSzakasz(kezdopont_bh_id=kezdopont_bh_id,vegpont_bh_id=vegpont_bh_id)
+        print(bhszakasz)
+        return bhszakasz
+
+    @staticmethod
     def get_from_DB(start_BHD,end_BHD,section_date,mozgalom):
         return BHSzakasz.objects.get((
                 (Q(kezdopont_bh_id=start_BHD.bh.bh_id) & Q(vegpont_bh_id=end_BHD.bh.bh_id)) |
@@ -150,6 +156,10 @@ class BHSzakasz(models.Model):
             (Q(end_date__gte=section_date) | Q(end_date__isnull=True)) &
             Q(okk_mozgalom=mozgalom)
         )
+    
+    @staticmethod
+    def get_actual_version_from_DB(start_bh:str,mozgalom:str):
+        return BHSzakasz.objects.get((Q(kezdopont_bh_id=start_bh)&Q(end_date__isnull=True)&Q(okk_mozgalom=mozgalom)))
 
 
 
@@ -208,10 +218,10 @@ class Turamozgalom(models.Model):
         """
         return Turamozgalom.objects.filter(
             Q(okk_mozgalom=mozgalom)
-            &
-            (Q(start_date__lte=min_date) | Q(start_date__isnull=True))
-            &
-            (Q(end_date__isnull=True) | Q(end_date__gte=max_date))
+            # &
+            # (Q(start_date__lte=min_date) | Q(start_date__isnull=True))
+            # &
+            # (Q(end_date__isnull=True) | Q(end_date__gte=max_date))
         )
 
     def __str__(self):

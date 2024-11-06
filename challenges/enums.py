@@ -11,6 +11,7 @@ class BookletTypes(Enum):
 class StampType(Enum):
     Digital = "digistamp"
     Kezi = "register"
+    DB = "db"
 
 
 @dataclass

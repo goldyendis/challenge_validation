@@ -143,7 +143,6 @@ class BHSzakasz(models.Model):
     @staticmethod
     def create_null_szakasz(kezdopont_bh_id,vegpont_bh_id):
         bhszakasz = BHSzakasz(kezdopont_bh_id=kezdopont_bh_id,vegpont_bh_id=vegpont_bh_id)
-        print(bhszakasz)
         return bhszakasz
 
     @staticmethod
@@ -159,8 +158,10 @@ class BHSzakasz(models.Model):
     
     @staticmethod
     def get_actual_version_from_DB(start_bh:str,mozgalom:str):
-        return BHSzakasz.objects.get((Q(kezdopont_bh_id=start_bh)&Q(end_date__isnull=True)&Q(okk_mozgalom=mozgalom)))
-
+        try:
+            return BHSzakasz.objects.get((Q(kezdopont_bh_id=start_bh)&Q(end_date__isnull=True)&Q(okk_mozgalom=mozgalom)))
+        except:
+            return None
 
 
     def __str__(self):

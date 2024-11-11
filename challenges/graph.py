@@ -10,7 +10,7 @@ from challenges.enums import DirectionType, StampType
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import networkx as nx
-from challenges.models import BHD, BHSzD, BHSzakasz
+from challenges.models import BHD, BHSzD, BHSzakasz, CustomNagyszakasz, NagySzakasz
 
 class NodeGraph:
     def __init__(self, kezdopont: str, vegpont: str, bhszd_sections: List[BHSzD],mozgalom:str):
@@ -19,12 +19,14 @@ class NodeGraph:
         self.mozgalom = mozgalom
         self.bhszd_sections = bhszd_sections
         self.current_time = datetime.now()
-        self.mozgalom_validation_edges = None
         self.bhszd_graph = None
         self.bhszd_graph_image = None
         self.validated_graph = None
         self.validated_graph_image = None
+        self.best_path = None
         self._create_graph()
+        self.completed_nagyszakasz = 0
+        
 
     def _create_graph(self):
         self.bhszd_graph = self._build_graph(self.bhszd_sections)
@@ -61,14 +63,42 @@ class NodeGraph:
                 return stamp_type_multiplier[StampType.Digital.value]+day_diff
 
     def validate_mozgalom(self):
-        best_path:List[BHSzD] = self.custom_dijkstra_path(self.bhszd_graph, self.kezdopont, self.vegpont, weight="weight")
-        print("BEST PATH", best_path)
+        self.best_path:List[BHSzD] = self.custom_dijkstra_path(self.bhszd_graph, self.kezdopont, self.vegpont, weight="weight")
         self.validated_graph= nx.MultiDiGraph()
-        for bhszd in best_path:
+        for bhszd in self.best_path:
             self.validated_graph.add_edge(bhszd.bh_szakasz.kezdopont_bh_id,bhszd.bh_szakasz.vegpont_bh_id,BHSzD=bhszd)
         self.validated_graph_image = self._create_graph_image(self.validated_graph)
+        self._group_bhszd_by_nagyszakasz()
 
 
+    def _group_bhszd_by_nagyszakasz(self):
+        nagyszakasz_bhszds = {}
+        for bhszd in self.best_path:
+            if bhszd.stamp_type != StampType.DB:
+                value = nagyszakasz_bhszds.get(bhszd.bh_szakasz.nagyszakasz_id, None)
+                if not value:
+                    nagyszakasz_bhszds[bhszd.bh_szakasz.nagyszakasz_id] = []
+                    nagyszakasz_bhszds[bhszd.bh_szakasz.nagyszakasz_id].append(bhszd)
+                else:
+                    value.append(bhszd)
+        print(nagyszakasz_bhszds)
+        for key,value in nagyszakasz_bhszds.items():
+            custom_nagyszakasz = CustomNagyszakasz(value,key)
+            print(custom_nagyszakasz.bhszds)
+            nagyszakasz_graph = nx.MultiDiGraph()
+            for edge in custom_nagyszakasz.bhszds:
+                nagyszakasz_graph.add_edge(edge.bh_szakasz.kezdopont_bh_id,edge.bh_szakasz.vegpont_bh_id,BHSzD=edge, weight=1)
+            print(nagyszakasz_graph.nodes)
+            print(nagyszakasz_graph.edges)
+            print(custom_nagyszakasz.db_nagyszakasz.kezdopont_bh_id)
+            print(custom_nagyszakasz.db_nagyszakasz.vegpont_bh_id)
+            try:
+                path = self.custom_dijkstra_path(nagyszakasz_graph,custom_nagyszakasz.db_nagyszakasz.kezdopont_bh_id, custom_nagyszakasz.db_nagyszakasz.vegpont_bh_id,weight="weight")
+                if path:
+                    self.completed_nagyszakasz+=1
+            except:
+                pass
+            print(f"{key}, {path}")        
 
     def custom_dijkstra_path(self, graph, source, target, weight="weight"):
         queue = [(0, source, [], [])]  
@@ -152,7 +182,7 @@ class NodeGraph:
                         visegrad_nagymaros_komp = BHSzD(
                             BHSzakasz.create_null_szakasz(end,new_id),
                             mozgalom=self.mozgalom,
-                            stamp_type=StampType.Digital,
+                            stamp_type=StampType.DB,
                             validation_time=self.current_time,
                             kezdopont=BHD.create_bhd_from_bh_id(end),
                             vegpont=BHD.create_bhd_from_bh_id(new_id),
@@ -178,7 +208,7 @@ class NodeGraph:
                             visegrad_nagymaros_komp = BHSzD(
                                 BHSzakasz.create_null_szakasz(end,new_id),
                                 mozgalom=self.mozgalom,
-                                stamp_type=StampType.Digital,
+                                stamp_type=StampType.DB,
                                 validation_time=self.current_time,
                                 kezdopont=BHD.create_bhd_from_bh_id(end),
                                 vegpont=BHD.create_bhd_from_bh_id(new_id),
@@ -276,13 +306,13 @@ class NodeGraph:
 
             if direction == DirectionType.Forward:
                 connectionstyle = f"arc3,rad={0 + key * 0.25}"  
-                arrowstyle = "-|>"
+                arrowstyle = "-|> "
             elif direction == DirectionType.Reverse:
                 connectionstyle = f"arc3,rad={-(0 + key * 0.25)}"  
-                arrowstyle = "<|-"
+                arrowstyle = " <|-"
             else:
                 connectionstyle = f"arc3,rad={0 + key * 0.25}"  
-                arrowstyle = "-|>"
+                arrowstyle = "-|> "
                     
             nx.draw_networkx_edges(
                 graph,

@@ -6,6 +6,8 @@ from challenges.enums import BookletTypes, DirectionType, StampType
 from challenges.models import BHD, BH, BHDList, BHSzD, BHSzakasz
 from django.db.models import Q
 
+from challenges.statistic import KekturaStatistics
+
 
 class ChallengeValidation:
     '''Class to proccess BHD and BHSZD '''
@@ -18,6 +20,7 @@ class ChallengeValidation:
         self.validate_bhszd_sections()
         self.nodeGraph = NodeGraph(self.kezdopont,self.vegpont,self.validated_bhszd,self.mozgalom)
         self.nodeGraph.validate_mozgalom()
+        self.statistics = KekturaStatistics(validated_bhszd=self.validated_bhszd,best_path=self.nodeGraph.best_path, completed_nagyszakasz=self.nodeGraph.completed_nagyszakasz)
         
     def create_BHD_objects(self, request)->BHDList[BHD]:
         '''Converts the request to a list of BHD objects'''

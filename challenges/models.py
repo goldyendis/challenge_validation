@@ -110,7 +110,31 @@ class BH(models.Model):
         return f"{self.objectid}: {self.bh_nev} s_date:{self.start_date}, e_date: {self.end_date}, {self.mtsz_id}, {self.bh_id}"
 
 
+class NagySzakasz(models.Model):
+    objectid = models.AutoField(primary_key=True)
+    sorszam = models.SmallIntegerField(null=True, blank=True)
+    nagyszakasz_id = models.CharField(max_length=30, null=True, blank=True)
+    kezdopont = models.CharField(max_length=60, null=True, blank=True)
+    kezdopont_bh_id = models.CharField(max_length=10, null=True, blank=True)
+    vegpont = models.CharField(max_length=60, null=True, blank=True)
+    vegpont_bh_id = models.CharField(max_length=10, null=True, blank=True)
+    szakasznev = models.CharField(max_length=120, null=True, blank=True)
+    tav = models.DecimalField(max_digits=12, decimal_places=8, null=True, blank=True)
+    szintemelkedes = models.SmallIntegerField(null=True, blank=True)
+    szintcsokkenes = models.SmallIntegerField(null=True, blank=True)
+    szintido_oda = models.CharField(max_length=15, null=True, blank=True)
+    szintido_vissza = models.CharField(max_length=15, null=True, blank=True)
+    gykt_tajegyseg = models.CharField(max_length=60, null=True, blank=True)
+    okk_mozgalom = models.CharField(max_length=10, null=True, blank=True)
+    start_date = models.DateTimeField(null=True, blank=True)
+    end_date = models.DateTimeField(null=True, blank=True)
+    shape = models.TextField(null=True, blank=True)  
+    class Meta:
+        db_table = 'nagyszakasz'
+        managed = False  
 
+    def __repr__(self):
+        return f"{self.nagyszakasz_id}, {self.kezdopont}, {self.vegpont}, {self.start_date}, {self.end_date}"
 
 
 class BHSzakasz(models.Model):
@@ -271,3 +295,30 @@ class BHSzD:
     def __repr__(self) -> str:
         return f"BHSzD with ID:{self.bh_szakasz.bhszakasz_id}, KezdoBH: {self.kezdopont.bh.bh_id} at {self.kezdopont.stamping_date}, VEGBH: {self.vegpont.bh.bh_id} at {self.vegpont.stamping_date}, Time: {self.stamping_date}, {self.stamp_type}, {self.mozgalom}, {self.direction}"
 
+class CustomNagyszakasz(NagySzakasz):
+    def __init__(self, bhszds:List[BHSzD],id:str,*args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.id = id
+        self.bhszds = bhszds
+        self.min_date, self.max_date = self._get_time_interval()
+        self.db_nagyszakasz = self.get_Nagyszakasz_from_db()
+        print(self.db_nagyszakasz)
+
+    def _get_time_interval(self):
+        return min(bhszd.stamping_date for bhszd in self.bhszds), max(bhszd.stamping_date for bhszd in self.bhszds)
+    
+    
+    def get_Nagyszakasz_from_db(self):
+        if isinstance(self.min_date, datetime):
+            self.min_date = self.min_date.isoformat()
+        if isinstance(self.max_date, datetime):
+            self.max_date = self.max_date.isoformat()
+        print(f"min_date: {self.min_date}, max_date: {self.max_date}")
+
+        return NagySzakasz.objects.filter(
+                nagyszakasz_id=self.id,
+            start_date__lte=self.min_date,
+            ).filter(Q(end_date__gte=self.max_date) | Q(end_date__isnull=True)).order_by('end_date').first()
+
+    def __repr__(self):
+        return f"CUSTOM Nagyszakasz: {len(self.bhszds)} elemmel, min date:{self.min_date}, max date:{self.max_date}, Nagyszakasz: {self.db_nagyszakasz}"

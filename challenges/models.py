@@ -3,7 +3,7 @@ from typing import List, Set
 from django.db import models
 from django.db.models import Q
 from rest_framework import exceptions
-from challenges.enums import BookletTypes, StampType
+from challenges.enums import BookletTypes, DirectionType, StampType
 
 
 class BHDList(list):
@@ -84,8 +84,11 @@ class BH(models.Model):
             vegpont:str = distinct_vegpont[0]
 
         return kezdopont, vegpont
-
-
+    @staticmethod
+    def get_actual_BH_from_bh_id(bh_id:str):
+        return BH.objects.filter(
+            Q(bh_id=bh_id) & Q(end_date__isnull=True)
+        ).first()
 
     @staticmethod
     def create_BH_from_request(json_stamp:dict,timestamp: datetime):
@@ -168,20 +171,6 @@ class BHSzakasz(models.Model):
         return f"{self.objectid}: {self.bhszakasz_id}, {self.szakasznev},{self.kezdopont_bh_id},{self.vegpont_bh_id} at s_date:{self.start_date}, e_date: {self.end_date}"
     
 
-class BHSzD:
-    def __init__(self, bh_szakasz:BHSzakasz, validation_time:datetime=None, stamp_type: StampType=None, mozgalom: BookletTypes=None ) -> None:
-        self.bh_szakasz:BHSzakasz = bh_szakasz
-        self.stamping_date :datetime = validation_time
-        self.stamp_type:StampType = stamp_type
-        self.mozgalom:BookletTypes =mozgalom
-        # self.bh_szakasz_id:str = bh_szakasz.bhszakasz_id
-        # self.kezdopont:BHD = bh_szakasz.kezdopont_bh_id
-        # self.vegpont:BHD = bh_szakasz.vegpont_bh_id
-    
-
-    def __repr__(self) -> str:
-        return f"BHSzD with ID:{self.bh_szakasz.bhszakasz_id}, KezdoBH: {self.bh_szakasz.kezdopont_bh_id}, VEGBH: {self.bh_szakasz.vegpont_bh_id}, Time: {self.stamping_date}, StampType: {self.stamp_type}, Mozgalom: {self.mozgalom}"
-
 
 class Turamozgalom(models.Model):
     objectid = models.AutoField(primary_key=True)
@@ -232,7 +221,7 @@ class Turamozgalom(models.Model):
 
 class BHD:
     '''Extending BH with properties and methods to validate Stamps'''
-    def __init__(self,bh:BH, timestamp:datetime,stamp_type:StampType) -> None:
+    def __init__(self,bh:BH, timestamp:datetime=None,stamp_type:StampType=None) -> None:
         self.bh:BH = bh
         self.stamping_date:datetime = timestamp
         self.stamp_type:StampType = stamp_type
@@ -250,5 +239,35 @@ class BHD:
         )
         return bhd
 
+    @staticmethod
+    def create_bhd_from_bh_id(bh_id:str):
+        bh:BH = BH.get_actual_BH_from_bh_id(bh_id)
+        return BHD(bh,timestamp=None,stamp_type=StampType.DB)
+
     def __repr__(self) -> str:
         return (f"BHD with ID:{self.bh.bh_id}, MTSZ_ID: {self.bh.mtsz_id}, NEV: {self.bh.bh_nev}, Time: {self.stamping_date}, Type: {self.stamp_type}")
+
+class BHSzD:
+    def __init__(self, bh_szakasz:BHSzakasz, validation_time:datetime=None, stamp_type: StampType=None, mozgalom: BookletTypes=None,kezdopont:BHD=None, vegpont:BHD=None, direction:DirectionType=DirectionType.Unknown ) -> None:
+        self.bh_szakasz:BHSzakasz = bh_szakasz
+        self.stamping_date :datetime = validation_time
+        self.stamp_type:StampType = stamp_type
+        self.mozgalom:BookletTypes =mozgalom
+        self.kezdopont:BHD = kezdopont
+        self.vegpont:BHD = vegpont
+        self.direction: DirectionType = direction
+        
+    # def _get_direction(self):
+    #     """Determines the direction based on the stamping dates of kezdopont and vegpont."""
+    #     if self.kezdopont is None or self.vegpont is None or self.kezdopont.stamping_date is None or self.vegpont.stamping_date is None:
+    #         return DirectionType.Unknown
+    #     elif self.kezdopont.stamping_date < self.vegpont.stamping_date:
+    #         return DirectionType.Forward
+    #     elif self.kezdopont.stamping_date > self.vegpont.stamping_date:
+    #         return DirectionType.Reverse
+    #     else:
+    #         return DirectionType.Unknown
+
+    def __repr__(self) -> str:
+        return f"BHSzD with ID:{self.bh_szakasz.bhszakasz_id}, KezdoBH: {self.kezdopont.bh.bh_id} at {self.kezdopont.stamping_date}, VEGBH: {self.vegpont.bh.bh_id} at {self.vegpont.stamping_date}, Time: {self.stamping_date}, {self.stamp_type}, {self.mozgalom}, {self.direction}"
+

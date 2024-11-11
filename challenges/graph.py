@@ -6,7 +6,7 @@ from typing import List
 import matplotlib
 from networkx import descendants
 import heapq
-from challenges.enums import StampType
+from challenges.enums import DirectionType, StampType
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import networkx as nx
@@ -18,26 +18,18 @@ class NodeGraph:
         self.vegpont = vegpont
         self.mozgalom = mozgalom
         self.bhszd_sections = bhszd_sections
-        # self.graph = None
         self.current_time = datetime.now()
         self.mozgalom_validation_edges = None
         self.bhszd_graph = None
         self.bhszd_graph_image = None
         self.validated_graph = None
+        self.validated_graph_image = None
         self._create_graph()
 
     def _create_graph(self):
-        self.bhszd_graph = self._build_graph(self.bhszd_sections,self._custom_edge_weight)
+        self.bhszd_graph = self._build_graph(self.bhszd_sections)
         self.bhszd_graph_image=self._create_graph_image(self.bhszd_graph)
 
-        # if self.bhszd_graph:
-        #     self.mozgalom_validation_edges = self._validate_mozgalom()
-        # else:
-        #     print("NO GRAPH BUILT SUCCESFULLY")
-        # print("Graph Nodes:", graph.nodes(data=True))
-        # print("Graph Edges:", graph.edges(data=True))
-        # Draw final graph
-        # return self._draw_graph(self.bhszd_graph, pos, edge_colors, edge_labels)
     
     def _create_graph_image(self,graph):
         pos = self._get_node_positions(graph)
@@ -47,62 +39,67 @@ class NodeGraph:
 
     def _custom_edge_weight(self,bhszd:BHSzD):
         stamp_type_multiplier = {
-            StampType.Digital:1,
-            StampType.Kezi:999999999,
-            StampType.DB:999999999999999999999
+            StampType.Digital.value:1,
+            StampType.Kezi.value:100000000,
+            StampType.DB.value:999999999999999999999999999
         }
         stamp_type = bhszd.stamp_type 
         stamp_time = bhszd.stamping_date
         if stamp_type == StampType.DB:
-            return stamp_type_multiplier[StampType.DB]
+            return stamp_type_multiplier[StampType.DB.value]
         elif stamp_type == StampType.Kezi:
+            day_diff = abs((self.current_time - stamp_time).total_seconds())/60
             if bhszd.bh_szakasz.end_date is None:
-                day_diff = abs((self.current_time - stamp_time).seconds)
-                return stamp_type_multiplier[StampType.Kezi]+day_diff
+                return stamp_type_multiplier[StampType.Kezi.value]+day_diff
             else:
-                day_diff = abs((self.current_time - stamp_time).seconds)
-                return stamp_type_multiplier[StampType.Kezi]+day_diff
+                return stamp_type_multiplier[StampType.Kezi.value]+day_diff
         else:
+            day_diff = abs((self.current_time - stamp_time).total_seconds())/60
             if bhszd.bh_szakasz.end_date is None:
-                day_diff = abs((self.current_time - stamp_time).seconds)
-                return stamp_type_multiplier[StampType.Digital]+day_diff
+                return stamp_type_multiplier[StampType.Digital.value]+day_diff
             else:
-                day_diff = abs((self.current_time - stamp_time).seconds)
-                return stamp_type_multiplier[StampType.Digital]+day_diff
+                return stamp_type_multiplier[StampType.Digital.value]+day_diff
 
     def validate_mozgalom(self):
-        dijkstra_path = nx.dijkstra_path(self.bhszd_graph, self.kezdopont, self.vegpont, weight="weight")
-        print(dijkstra_path)
-        # try:
-        #     # Get nodes in the shortest path
-        #     shortest_path_nodes = nx.dijkstra_path(
-        #         self.bhszd_graph, source=self.kezdopont, target=self.vegpont, weight="weight"
-        #     )
-        #     shortest_path_nodes_astar = nx.astar_path(self.bhszd_graph, self.kezdopont, self.vegpont, weight="weight", heuristic=lambda u, v: 0)
-        #     print(shortest_path_nodes_astar)
-            
-        #     # Collect edges in the path based on node pairs
-        #     path_edges = []
-        #     for i in range(len(shortest_path_nodes) - 1):
-        #         u, v = shortest_path_nodes[i], shortest_path_nodes[i + 1]
-        #         edge_data = self.bhszd_graph.get_edge_data(u, v)
-        #         best_edge = None
-        #         min_weight = float('inf')
-                
-        #         for edge_key, edge_attrs in edge_data.items():
-        #             weight = edge_attrs["weight"]
-        #             if weight <= min_weight:
-        #                 min_weight = weight
-        #                 best_edge = (edge_attrs["BHSzD"])
+        best_path:List[BHSzD] = self.custom_dijkstra_path(self.bhszd_graph, self.kezdopont, self.vegpont, weight="weight")
+        print("BEST PATH", best_path)
+        self.validated_graph= nx.MultiDiGraph()
+        for bhszd in best_path:
+            self.validated_graph.add_edge(bhszd.bh_szakasz.kezdopont_bh_id,bhszd.bh_szakasz.vegpont_bh_id,BHSzD=bhszd)
+        self.validated_graph_image = self._create_graph_image(self.validated_graph)
 
-        #         if best_edge:
-        #             path_edges.append(best_edge)
-        #     print("NODES", shortest_path_nodes)
-        #     print("Edges", path_edges)
-        #     return path_edges
-        # except nx.NetworkXNoPath:
-        #     print("No valid path found.")
 
+
+    def custom_dijkstra_path(self, graph, source, target, weight="weight"):
+        queue = [(0, source, [], [])]  
+        visited = set()
+
+        while queue:
+            (cost, u, path, edge_used) = heapq.heappop(queue)
+
+            if u in visited:
+                continue
+            visited.add(u)
+
+            path = path + [u]
+
+            if u == target:
+                return edge_used 
+
+            for v, edge_data in graph[u].items():
+                min_edge_weight = float('inf')
+                best_bhszd = None
+                for edge_key, edge in edge_data.items():
+                    edge_weight = edge.get(weight, float('inf'))
+                    if edge_weight < min_edge_weight:
+                        min_edge_weight = edge_weight
+                        best_bhszd = edge["BHSzD"]
+
+                if v not in visited and best_bhszd:
+                    new_edge_used = edge_used + [best_bhszd]
+                    heapq.heappush(queue, (cost + min_edge_weight, v, path, new_edge_used))
+
+        return None
 
 
     def sort_bhszd_key(self, bhszd):
@@ -122,11 +119,11 @@ class NodeGraph:
         
         return (kezdopont_key, vegpont_key)
 
-    def _build_graph(self, bhszd_sections, custom_weight = None) -> nx.MultiDiGraph:
+    def _build_graph(self, bhszd_sections) -> nx.MultiDiGraph:
         """Creates and populates the directed graph dynamically as we reach new nodes."""
         graph = nx.MultiDiGraph()
         
-        sorted_bhszd_sections = sorted(bhszd_sections, key=self.sort_bhszd_key)
+        sorted_bhszd_sections:List[BHSzD] = sorted(bhszd_sections, key=self.sort_bhszd_key)
         bhszd_edges = {}
         for bhszd in sorted_bhszd_sections:
             start = bhszd.bh_szakasz.kezdopont_bh_id
@@ -136,51 +133,69 @@ class NodeGraph:
                 bhszd_edges[start] = [bhszd]
         visited_nodes = set() 
         farthest_node = self.kezdopont
-        edges_for_graph = []
+        edges_for_graph:List[BHSzD] = []
 
-            
         while farthest_node != self.vegpont:
             if farthest_node not in visited_nodes:
                 visited_nodes.add(farthest_node)
-                
                 if farthest_node in bhszd_edges:
                     for bhszd in bhszd_edges[farthest_node]:
                         start, end = bhszd.bh_szakasz.kezdopont_bh_id, bhszd.bh_szakasz.vegpont_bh_id
                         edges_for_graph.append(bhszd)
-                    if bhszd_edges[farthest_node] != "OKTPH_79":
+                    if bhszd.bh_szakasz.vegpont != "Visegrád":
                         bhszd_edges.pop(farthest_node)
                         farthest_node = end
                     else:
                         number = int(end.split("_")[1])
                         bhszd_edges.pop(farthest_node)
-                        farthest_node = f"OKTPH_{number+1}" 
-                    
-                else:
-                    bhszakasz = BHSzakasz.get_actual_version_from_DB(farthest_node, self.mozgalom)
-                    if bhszakasz:
-                        start, end = bhszakasz.kezdopont_bh_id, bhszakasz.vegpont_bh_id
-                        edges_for_graph.append(BHSzD(bhszakasz,mozgalom=self.mozgalom,validation_time=self.current_time,stamp_type=StampType.DB))
-                        if bhszakasz.vegpont != "Visegrád":
-                            farthest_node = end
-                    else:
-                        number = int(end.split("_")[1])
                         new_id = f"OKTPH_{number+1}"
                         visegrad_nagymaros_komp = BHSzD(
                             BHSzakasz.create_null_szakasz(end,new_id),
                             mozgalom=self.mozgalom,
                             stamp_type=StampType.Digital,
-                            validation_time=self.current_time)
+                            validation_time=self.current_time,
+                            kezdopont=BHD.create_bhd_from_bh_id(end),
+                            vegpont=BHD.create_bhd_from_bh_id(new_id),
+                            )
                         edges_for_graph.append(visegrad_nagymaros_komp)
                         farthest_node = new_id
+                
+                else:
+                    bhszakasz = BHSzakasz.get_actual_version_from_DB(farthest_node, self.mozgalom)
+                    if bhszakasz:
+                        start, end = bhszakasz.kezdopont_bh_id, bhszakasz.vegpont_bh_id
+                        edges_for_graph.append(BHSzD(
+                            bhszakasz,mozgalom=self.mozgalom,validation_time=self.current_time,stamp_type=StampType.DB,
+                            kezdopont=BHD.create_bhd_from_bh_id(bhszakasz.kezdopont_bh_id),
+                            vegpont=BHD.create_bhd_from_bh_id(bhszakasz.vegpont_bh_id),
+                            direction=DirectionType.Unknown
+                            ))
+                        if bhszakasz.vegpont != "Visegrád":
+                            farthest_node = end
+                        else:
+                            number = int(end.split("_")[1])
+                            new_id = f"OKTPH_{number+1}"
+                            visegrad_nagymaros_komp = BHSzD(
+                                BHSzakasz.create_null_szakasz(end,new_id),
+                                mozgalom=self.mozgalom,
+                                stamp_type=StampType.Digital,
+                                validation_time=self.current_time,
+                                kezdopont=BHD.create_bhd_from_bh_id(end),
+                                vegpont=BHD.create_bhd_from_bh_id(new_id),
+                                )
+                            edges_for_graph.append(visegrad_nagymaros_komp)
+                            farthest_node = new_id
 
-        for stamp,_ in bhszd_edges.items():
-            for bhszd in bhszd_edges[stamp]:
-                start, end = bhszd.bh_szakasz.kezdopont_bh_id, bhszd.bh_szakasz.vegpont_bh_id
-                edges_for_graph.append(bhszd)
+        if len(bhszd_edges.keys())>0:
+            for stamp,_ in bhszd_edges.items():
+                for bhszd in bhszd_edges[stamp]:
+                    start, end = bhszd.bh_szakasz.kezdopont_bh_id, bhszd.bh_szakasz.vegpont_bh_id
+                    edges_for_graph.append(bhszd)
 
         sorted_edges_for_graph=sorted(edges_for_graph, key=self.sort_bhszd_key)
+
         for bhszd in sorted_edges_for_graph:
-            edge_weight = custom_weight(bhszd)
+            edge_weight = int(self._custom_edge_weight(bhszd))
             graph.add_edge(bhszd.bh_szakasz.kezdopont_bh_id,bhszd.bh_szakasz.vegpont_bh_id,BHSzD=bhszd, weight=edge_weight)
         return graph
 
@@ -196,7 +211,6 @@ class NodeGraph:
         direction = 1 
 
         row_start_x = 0   
-
         for i, node in enumerate(graph.nodes):
             row_index = i // max_nodes_per_row
             node_index_in_row = i % max_nodes_per_row
@@ -253,19 +267,32 @@ class NodeGraph:
         plt.figure(figsize=(22, 22), dpi=200)
         
         labels = {node: '_\n'.join(node.split('_', 1)) if '_' in node else node for node in graph.nodes}
-        nx.draw_networkx_nodes(graph, pos, node_size=1100, node_color="lightblue")
+        nx.draw_networkx_nodes(graph, pos, node_size=300, node_color="lightblue")
         nx.draw_networkx_labels(graph, pos, font_size=7, labels=labels)
 
         for ((u, v, key), color) in zip(graph.edges(keys=True), edge_colors):
-            connectionstyle = "arc3,rad=0" if key == 0 else f"arc3,rad={0 + key * -0.25}"
-            
+            bhszd = graph[u][v][key]["BHSzD"]
+            direction = bhszd.direction
+
+            if direction == DirectionType.Forward:
+                connectionstyle = f"arc3,rad={0 + key * 0.25}"  
+                arrowstyle = "-|>"
+            elif direction == DirectionType.Reverse:
+                connectionstyle = f"arc3,rad={-(0 + key * 0.25)}"  
+                arrowstyle = "<|-"
+            else:
+                connectionstyle = f"arc3,rad={0 + key * 0.25}"  
+                arrowstyle = "-|>"
+                    
             nx.draw_networkx_edges(
                 graph,
                 pos,
                 edgelist=[(u, v)],
                 edge_color=[color],
                 width=2,
-                connectionstyle=connectionstyle
+                connectionstyle=connectionstyle,
+                arrowstyle=arrowstyle,
+        arrowsize=15
             )
         self._draw_edge_labels(pos, edge_labels)
 

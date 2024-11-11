@@ -42,6 +42,7 @@ class Challenges(APIView):
             'mozgalom_vegpontBH': challenge.vegpont,
             'valid_bhszd': bhszd_serializer.data,
             'sorted_BHD': bhd_serializer.data,
-            'image':challenge.nodeGraph.bhszd_graph_image
+            'image':challenge.nodeGraph.bhszd_graph_image if challenge.nodeGraph.bhszd_graph_image is not None else "",
+            'image_mozgalom':challenge.nodeGraph.validated_graph_image if challenge.nodeGraph.validated_graph_image is not None else ""
         }, status=status.HTTP_200_OK)
     

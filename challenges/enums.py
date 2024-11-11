@@ -14,6 +14,11 @@ class StampType(Enum):
     DB = "db"
 
 
+class DirectionType(Enum):
+    Forward = "forward"
+    Reverse = "reverse"
+    Unknown = "unknown"
+
 @dataclass
 class JSONBH(ABC):
     mtsz_id: str

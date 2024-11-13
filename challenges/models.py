@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List, Set
 from django.db import models
 from django.db.models import Q
@@ -272,7 +272,7 @@ class BHD:
         return (f"BHD with ID:{self.bh.bh_id}, MTSZ_ID: {self.bh.mtsz_id}, NEV: {self.bh.bh_nev}, Time: {self.stamping_date}, Type: {self.stamp_type}")
 
 class BHSzD:
-    def __init__(self, bh_szakasz:BHSzakasz, validation_time:datetime=None, stamp_type: StampType=None, mozgalom: BookletTypes=None,kezdopont:BHD=None, vegpont:BHD=None, direction:DirectionType=DirectionType.Unknown ) -> None:
+    def __init__(self, bh_szakasz:BHSzakasz, validation_time:datetime=None, stamp_type: StampType=None, mozgalom: BookletTypes=None,kezdopont:BHD=None, vegpont:BHD=None, direction:DirectionType=DirectionType.Unknown,speed=None ) -> None:
         self.bh_szakasz:BHSzakasz = bh_szakasz
         self.stamping_date :datetime = validation_time
         self.stamp_type:StampType = stamp_type
@@ -280,20 +280,16 @@ class BHSzD:
         self.kezdopont:BHD = kezdopont
         self.vegpont:BHD = vegpont
         self.direction: DirectionType = direction
-        
-    # def _get_direction(self):
-    #     """Determines the direction based on the stamping dates of kezdopont and vegpont."""
-    #     if self.kezdopont is None or self.vegpont is None or self.kezdopont.stamping_date is None or self.vegpont.stamping_date is None:
-    #         return DirectionType.Unknown
-    #     elif self.kezdopont.stamping_date < self.vegpont.stamping_date:
-    #         return DirectionType.Forward
-    #     elif self.kezdopont.stamping_date > self.vegpont.stamping_date:
-    #         return DirectionType.Reverse
-    #     else:
-    #         return DirectionType.Unknown
+        self.time:int|None = self._get_time_difference()
+        self.speed:float = speed*3.6 if speed else None
+
+    def _get_time_difference(self)-> int:
+        if self.stamp_type == StampType.Digital:
+            return abs((self.vegpont.stamping_date - self.kezdopont.stamping_date).total_seconds())
+        return None
 
     def __repr__(self) -> str:
-        return f"BHSzD with ID:{self.bh_szakasz.bhszakasz_id}, KezdoBH: {self.kezdopont.bh.bh_id} at {self.kezdopont.stamping_date}, VEGBH: {self.vegpont.bh.bh_id} at {self.vegpont.stamping_date}, Time: {self.stamping_date}, {self.stamp_type}, {self.mozgalom}, {self.direction}"
+        return f"BHSzD with ID:{self.bh_szakasz.bhszakasz_id}, KezdoBH: {self.kezdopont.bh.bh_id} at {self.kezdopont.stamping_date}, VEGBH: {self.vegpont.bh.bh_id} at {self.vegpont.stamping_date}, Time: {self.stamping_date}, {self.stamp_type}, {self.mozgalom}, {self.direction}, {self.speed}km/h, {self.time} minutes"
 
 class CustomNagyszakasz(NagySzakasz):
     def __init__(self, bhszds:List[BHSzD],id:str,*args, **kwargs):
@@ -302,23 +298,22 @@ class CustomNagyszakasz(NagySzakasz):
         self.bhszds = bhszds
         self.min_date, self.max_date = self._get_time_interval()
         self.db_nagyszakasz = self.get_Nagyszakasz_from_db()
-        print(self.db_nagyszakasz)
 
     def _get_time_interval(self):
         return min(bhszd.stamping_date for bhszd in self.bhszds), max(bhszd.stamping_date for bhszd in self.bhszds)
     
-    
+
     def get_Nagyszakasz_from_db(self):
         if isinstance(self.min_date, datetime):
             self.min_date = self.min_date.isoformat()
         if isinstance(self.max_date, datetime):
             self.max_date = self.max_date.isoformat()
-        print(f"min_date: {self.min_date}, max_date: {self.max_date}")
-
-        return NagySzakasz.objects.filter(
+        try:
+            return NagySzakasz.objects.filter(
                 nagyszakasz_id=self.id,
             start_date__lte=self.min_date,
             ).filter(Q(end_date__gte=self.max_date) | Q(end_date__isnull=True)).order_by('end_date').first()
-
+        except NagySzakasz.DoesNotExist:
+            return None
     def __repr__(self):
         return f"CUSTOM Nagyszakasz: {len(self.bhszds)} elemmel, min date:{self.min_date}, max date:{self.max_date}, Nagyszakasz: {self.db_nagyszakasz}"

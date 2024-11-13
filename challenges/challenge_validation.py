@@ -20,7 +20,7 @@ class ChallengeValidation:
         self.validate_bhszd_sections()
         self.nodeGraph = NodeGraph(self.kezdopont,self.vegpont,self.validated_bhszd,self.mozgalom)
         self.nodeGraph.validate_mozgalom()
-        self.statistics = KekturaStatistics(validated_bhszd=self.validated_bhszd,best_path=self.nodeGraph.best_path, completed_nagyszakasz=self.nodeGraph.completed_nagyszakasz)
+        self.statistics = KekturaStatistics(validated_bhszd=self.validated_bhszd,best_path=self.nodeGraph.best_path, completed_nagyszakasz=self.nodeGraph.completed_nagyszakasz, all_nagyszakasz = self.nodeGraph.all_nagyszakasz)
         
     def create_BHD_objects(self, request)->BHDList[BHD]:
         '''Converts the request to a list of BHD objects'''
@@ -35,10 +35,10 @@ class ChallengeValidation:
         return bhd_list
 
     def process_timestamps(self,stamp:dict) -> datetime:
-        '''Convert UNIX timestamp to datetime format'''
-        timestamp_unix: int = stamp.get('fulfillmentDate')
-        timestamp = datetime.fromtimestamp(timestamp_unix)
-        return timestamp
+        timestamp_iso: int = stamp.get('fulfillmentDate')
+        timestamp = datetime.fromisoformat(timestamp_iso.replace("Z", "+00:00"))
+        time = timestamp.replace(tzinfo=None)
+        return time
 
     def sort_BHDs(self):
         '''BHD list sorter. First with date, then StampType, then timestamp, and lastly BH_ID'''
@@ -68,8 +68,9 @@ class ChallengeValidation:
                     if bh_szakasz:
                         bhszd_stamp_type:StampType = self._get_stamp_type([self.BHD_list[a], self.BHD_list[b]])
                         if bhszd_stamp_type.value == "digistamp":
-                            if self.velocity_checked(bh_szakasz.tav, self.BHD_list[a].stamping_date, self.BHD_list[b].stamping_date):
-                                self._add_to_validated_bhszd(bh_szakasz, section_date,bhszd_stamp_type,self.BHD_list[a],self.BHD_list[b])
+                            is_valid,speed = self.velocity_checked(bh_szakasz.tav, self.BHD_list[a].stamping_date, self.BHD_list[b].stamping_date)
+                            if is_valid:
+                                self._add_to_validated_bhszd(bh_szakasz, section_date,bhszd_stamp_type,self.BHD_list[a],self.BHD_list[b],speed)
                             else:
                                 failed = True
                         else:
@@ -90,8 +91,9 @@ class ChallengeValidation:
                                     if bh_szakasz:
                                         bhszd_stamp_type:StampType = self._get_stamp_type([self.BHD_list[a], self.BHD_list[c]])
                                         if bhszd_stamp_type.value == "digistamp":
-                                            if self.velocity_checked(bh_szakasz.tav, self.BHD_list[a].stamping_date, self.BHD_list[c].stamping_date):
-                                                self._add_to_validated_bhszd(bh_szakasz, section_date,bhszd_stamp_type,self.BHD_list[a],self.BHD_list[c])
+                                            is_valid,speed = self.velocity_checked(bh_szakasz.tav, self.BHD_list[a].stamping_date, self.BHD_list[c].stamping_date)
+                                            if is_valid:
+                                                self._add_to_validated_bhszd(bh_szakasz, section_date,bhszd_stamp_type,self.BHD_list[a],self.BHD_list[c],speed)
                                 else:
                                     section_date:datetime = min(self.BHD_list[a].stamping_date, self.BHD_list[c].stamping_date)
                                     bh_szakasz = self.find_section(self.BHD_list[a], self.BHD_list[c],section_date)
@@ -103,11 +105,11 @@ class ChallengeValidation:
 
                 b += 1
 
-    def _add_to_validated_bhszd(self, bh_szakasz: BHSzakasz, section_date: datetime,bhszd_stamp_type:StampType, a_BHD:BHD, b_BHD:BHD)->None:
+    def _add_to_validated_bhszd(self, bh_szakasz: BHSzakasz, section_date: datetime,bhszd_stamp_type:StampType, a_BHD:BHD, b_BHD:BHD, speed:float=None)->None:
         start, end = self._match_bhd_with_section_ends(a_BHD, b_BHD, bh_szakasz)
         direction = self._get_direction(start,end,bhszd_stamp_type)
         bhszd = BHSzD(bh_szakasz,section_date,bhszd_stamp_type,self.mozgalom,
-                    start,end,direction)
+                    start,end,direction,speed)
         self.validated_bhszd.append(bhszd)
 
     def _match_bhd_with_section_ends(self, a_bhd:BHD, b_bhd:BHD, section:BHSzakasz)-> Tuple[BHD]: 
@@ -142,7 +144,7 @@ class ChallengeValidation:
     def velocity_checked(self, tav: float, start_time: datetime, end_time: datetime) -> bool:
         """Check if the calculated speed meets requirements"""
         speed = self.get_speed(start_time, end_time, tav)
-        return speed <= 4.17  
+        return speed <= 4.17, speed  
 
     def get_speed(self, start_time,end_time, tav)-> float:
         time = self.get_time_difference(start_time,end_time)

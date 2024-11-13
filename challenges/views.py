@@ -4,7 +4,7 @@ from requests import Response
 from rest_framework.views import APIView
 from challenges.challenge_validation import ChallengeValidation
 from challenges.models import BH
-from challenges.serializer import BHDSerializer, BHSzDSerializer, BHSzakaszSerializer
+from challenges.serializer import BHDSerializer, BHSzDSerializer, BHSzakaszSerializer, StatisticSerializer
 from router.exceptions import UnauthorizedException
 from router.views import verify_api_key
 from rest_framework.renderers import JSONRenderer,BrowsableAPIRenderer
@@ -34,6 +34,7 @@ class Challenges(APIView):
         challenge = ChallengeValidation(request)
         bhd_serializer = BHDSerializer(challenge.BHD_list,many=True)
         bhszd_serializer = BHSzDSerializer(challenge.validated_bhszd, many=True)
+        statistic_serializer = StatisticSerializer(challenge.statistics.statistic_data)
 
         return Response({
             'status': 'success',
@@ -43,6 +44,8 @@ class Challenges(APIView):
             'valid_bhszd': bhszd_serializer.data,
             'sorted_BHD': bhd_serializer.data,
             'image':challenge.nodeGraph.bhszd_graph_image if challenge.nodeGraph.bhszd_graph_image is not None else "",
-            'image_mozgalom':challenge.nodeGraph.validated_graph_image if challenge.nodeGraph.validated_graph_image is not None else ""
+            'image_mozgalom':challenge.nodeGraph.validated_graph_image if challenge.nodeGraph.validated_graph_image is not None else "",
+            'statistics': statistic_serializer.data
+
         }, status=status.HTTP_200_OK)
     

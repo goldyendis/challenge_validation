@@ -12,6 +12,8 @@ router/
 router/**
 routing_backend/
 routing_backend/**
+kozeptaj/
+kozeptaj/**
 search/
 search/**
 weather/

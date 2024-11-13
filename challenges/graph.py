@@ -1,5 +1,5 @@
 import base64
-from datetime import datetime
+from datetime import datetime, timezone
 import io
 import re
 from typing import List
@@ -26,6 +26,7 @@ class NodeGraph:
         self.best_path = None
         self._create_graph()
         self.completed_nagyszakasz = 0
+        self.all_nagyszakasz = 0
         
 
     def _create_graph(self):
@@ -73,6 +74,7 @@ class NodeGraph:
 
     def _group_bhszd_by_nagyszakasz(self):
         nagyszakasz_bhszds = {}
+        nagyszakasz_db = {}
         for bhszd in self.best_path:
             if bhszd.stamp_type != StampType.DB:
                 value = nagyszakasz_bhszds.get(bhszd.bh_szakasz.nagyszakasz_id, None)
@@ -81,24 +83,26 @@ class NodeGraph:
                     nagyszakasz_bhszds[bhszd.bh_szakasz.nagyszakasz_id].append(bhszd)
                 else:
                     value.append(bhszd)
-        print(nagyszakasz_bhszds)
+            else:
+                if bhszd.bh_szakasz.nagyszakasz_id:
+                    value = nagyszakasz_db.get(bhszd.bh_szakasz.nagyszakasz_id, None)
+                    if not value:
+                        nagyszakasz_db[bhszd.bh_szakasz.nagyszakasz_id] = []
+                        nagyszakasz_db[bhszd.bh_szakasz.nagyszakasz_id].append(bhszd)
+                    else:
+                        value.append(bhszd)
+        self.all_nagyszakasz = len(nagyszakasz_db.keys())
         for key,value in nagyszakasz_bhszds.items():
             custom_nagyszakasz = CustomNagyszakasz(value,key)
-            print(custom_nagyszakasz.bhszds)
             nagyszakasz_graph = nx.MultiDiGraph()
             for edge in custom_nagyszakasz.bhszds:
                 nagyszakasz_graph.add_edge(edge.bh_szakasz.kezdopont_bh_id,edge.bh_szakasz.vegpont_bh_id,BHSzD=edge, weight=1)
-            print(nagyszakasz_graph.nodes)
-            print(nagyszakasz_graph.edges)
-            print(custom_nagyszakasz.db_nagyszakasz.kezdopont_bh_id)
-            print(custom_nagyszakasz.db_nagyszakasz.vegpont_bh_id)
             try:
                 path = self.custom_dijkstra_path(nagyszakasz_graph,custom_nagyszakasz.db_nagyszakasz.kezdopont_bh_id, custom_nagyszakasz.db_nagyszakasz.vegpont_bh_id,weight="weight")
                 if path:
                     self.completed_nagyszakasz+=1
             except:
                 pass
-            print(f"{key}, {path}")        
 
     def custom_dijkstra_path(self, graph, source, target, weight="weight"):
         queue = [(0, source, [], [])]  

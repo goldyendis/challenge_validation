@@ -3,6 +3,8 @@ from pyproj import Transformer
 from rest_framework import serializers
 from .models import BH, BHSzakasz, Turamozgalom
 from django.db import connections
+from decimal import Decimal, ROUND_HALF_UP
+
 
 class BHPointSerializer(serializers.ModelSerializer):
     class Meta:
@@ -100,3 +102,41 @@ class BHSzDSerializer(serializers.Serializer):
         return serializer.data
     
 
+class StatisticSerializer(serializers.Serializer):
+    mozgalom_completed = serializers.BooleanField()
+    all_length = serializers.SerializerMethodField()
+    completed_length = serializers.SerializerMethodField()
+    length_percentage = serializers.SerializerMethodField()
+    remaining_length = serializers.SerializerMethodField()
+    completed_elevation = serializers.IntegerField()
+    all_elevation = serializers.IntegerField()
+    elevation_percentage = serializers.SerializerMethodField()
+    completed_stamps = serializers.IntegerField()
+    remaining_stamps = serializers.IntegerField()
+    completed_main_sections = serializers.IntegerField()
+    all_main_sections = serializers.IntegerField()
+    average_speed = serializers.SerializerMethodField()
+    time_on_blue = serializers.DictField()
+    since_first_stamp_time_diff = serializers.DictField()
+    excepted_completion = serializers.DictField()
+
+    def _round_decimal(self, value):
+        return float(Decimal(value).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP))
+
+    def get_all_length(self, obj):
+        return self._round_decimal(obj.all_length)
+
+    def get_completed_length(self, obj):
+        return self._round_decimal(obj.completed_length)
+
+    def get_length_percentage(self, obj):
+        return self._round_decimal(obj.length_percentage)
+
+    def get_remaining_length(self, obj):
+        return self._round_decimal(obj.remaining_length)
+
+    def get_elevation_percentage(self, obj):
+        return self._round_decimal(obj.elevation_percentage)
+
+    def get_average_speed(self, obj):
+        return self._round_decimal(obj.average_speed)

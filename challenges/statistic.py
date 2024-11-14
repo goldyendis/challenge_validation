@@ -2,9 +2,8 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Dict, List, Set
 from challenges.enums import DirectionType, StampType
-from challenges.models import BHD, BHSzD
+from challenges.models import BHSzD
 from dateutil.relativedelta import relativedelta
-from decimal import Decimal, ROUND_HALF_UP
 
 
 @dataclass
@@ -49,8 +48,8 @@ class KekturaStatistics:
         valid_bhszd_time = 0
         completed_elevation = 0
         all_elevation = 0
-        start_date=min(bhszd.stamping_date for bhszd in self.valid_bhszds if bhszd.stamp_type != StampType.DB and bhszd.stamping_date is not None)
-        end_date=max(bhszd.stamping_date for bhszd in self.valid_bhszds if bhszd.stamp_type != StampType.DB and bhszd.stamping_date is not None)
+        start_date= min((bhszd.stamping_date for bhszd in self.valid_bhszds if bhszd.stamp_type != StampType.DB and bhszd.stamping_date is not None),default=None)
+        end_date=max((bhszd.stamping_date for bhszd in self.valid_bhszds if bhszd.stamp_type != StampType.DB and bhszd.stamping_date is not None), default = None)
         for path in self.best_path:
             length =self._get_validated_length(path)
             self._add_stamp_to_collection(path,all_stamps)
@@ -149,14 +148,3 @@ class KekturaStatistics:
         self.statistic_data.completed_stamps = len(collected_stamps)
         self.statistic_data.remaining_stamps = len(all_stamps)-len(collected_stamps)
 
-
-#Teljesített szintemelkedés
-
-
-#Teljesített főszakaszok száma (5/27)
-
-#------ÖSSZES BHSZD-ből jön -------
-#Kéktúrázással töltött idő
-#Átlagsebesség
-#Első bélyegzés óta eltelt idő, vagy, ha kész van, akkor meddig tartott a teljesítés
-#Várható befejezés...

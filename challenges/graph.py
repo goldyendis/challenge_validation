@@ -1,16 +1,15 @@
 import base64
-from datetime import datetime, timezone
+from datetime import datetime
 import io
 import re
 from typing import List
 import matplotlib
-from networkx import descendants
 import heapq
 from challenges.enums import DirectionType, StampType
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import networkx as nx
-from challenges.models import BHD, BHSzD, BHSzakasz, CustomNagyszakasz, NagySzakasz
+from challenges.models import BHD, BHSzD, BHSzakasz, CustomNagyszakasz
 
 class NodeGraph:
     def __init__(self, kezdopont: str, vegpont: str, bhszd_sections: List[BHSzD],mozgalom:str):

@@ -7,14 +7,13 @@ from challenges.models import BH
 from challenges.serializer import BHDSerializer, BHSzDSerializer, BHSzakaszSerializer, StatisticSerializer
 from router.exceptions import UnauthorizedException
 from router.views import verify_api_key
-from rest_framework.renderers import JSONRenderer,BrowsableAPIRenderer
+from rest_framework.renderers import JSONRenderer
 from rest_framework.response import Response
 from rest_framework import status
 
 
 class Challenges(APIView):
-    # renderer_classes = [JSONRenderer]
-    renderer_classes = [JSONRenderer, BrowsableAPIRenderer]
+    renderer_classes = [JSONRenderer]
 
     def handle_exception(self, exc):
         language = self.request.data.get("language", "hu")

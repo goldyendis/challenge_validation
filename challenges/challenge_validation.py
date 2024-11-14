@@ -1,10 +1,9 @@
 from datetime import datetime, timedelta
-from typing import Dict, List, Set, Tuple
+from typing import List, Tuple
 
 from challenges.graph import NodeGraph
 from challenges.enums import BookletTypes, DirectionType, StampType
 from challenges.models import BHD, BH, BHDList, BHSzD, BHSzakasz
-from django.db.models import Q
 
 from challenges.statistic import KekturaStatistics
 

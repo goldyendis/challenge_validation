@@ -1,5 +1,5 @@
-from datetime import datetime, timezone
-from typing import List, Set
+from datetime import datetime
+from typing import List
 from django.db import models
 from django.db.models import Q
 from rest_framework import exceptions

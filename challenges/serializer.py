@@ -57,6 +57,8 @@ class BHSzakaszSerializer(serializers.ModelSerializer):
             "coordinates": coords
         }
         return geojson
+    
+    
 class TuramozgalomSerializer(serializers.ModelSerializer):
     class Meta:
         model = Turamozgalom

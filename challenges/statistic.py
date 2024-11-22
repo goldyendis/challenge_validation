@@ -2,7 +2,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Dict, List, Set
 from challenges.enums import DirectionType, StampType
-from challenges.models import BHSzD
+from challenges.models import BHD, BHDList, BHSzD
 from dateutil.relativedelta import relativedelta
 
 
@@ -30,7 +30,8 @@ class Statistic:
 
 
 class KekturaStatistics:
-    def __init__(self, validated_bhszd:List[BHSzD], best_path:List[BHSzD], completed_nagyszakasz:int, all_nagyszakasz:int):
+    def __init__(self, validated_bhd:BHDList[BHD],validated_bhszd:List[BHSzD], best_path:List[BHSzD], completed_nagyszakasz:int, all_nagyszakasz:int):
+        self.validated_bhd = validated_bhd
         self.valid_bhszds = validated_bhszd
         self.best_path = best_path
         self.completed_main_section = completed_nagyszakasz
@@ -48,8 +49,8 @@ class KekturaStatistics:
         valid_bhszd_time = 0
         completed_elevation = 0
         all_elevation = 0
-        start_date= min((bhszd.stamping_date for bhszd in self.valid_bhszds if bhszd.stamp_type != StampType.DB and bhszd.stamping_date is not None),default=None)
-        end_date=max((bhszd.stamping_date for bhszd in self.valid_bhszds if bhszd.stamp_type != StampType.DB and bhszd.stamping_date is not None), default = None)
+        start_date = self.validated_bhd.get_min_stamping_date()
+        end_date = self.validated_bhd.get_max_stamping_date()
         for path in self.best_path:
             length =self._get_validated_length(path)
             self._add_stamp_to_collection(path,all_stamps)

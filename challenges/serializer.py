@@ -1,7 +1,7 @@
 import re
 from pyproj import Transformer
 from rest_framework import serializers
-from .models import BH, BHSzakasz, Turamozgalom
+from .models import BH, BHD, BHSzD, BHSzakasz, Turamozgalom
 from django.db import connections
 from decimal import Decimal, ROUND_HALF_UP
 
@@ -64,6 +64,12 @@ class TuramozgalomSerializer(serializers.ModelSerializer):
         model = Turamozgalom
         fields = '__all__'
 
+class BH_Dev_Serializer(serializers.Serializer):
+    ver_id = serializers.SerializerMethodField()
+
+    def get_ver_id(self,obj):
+        return obj.bh.ver_id
+
 class BHDSerializer(serializers.Serializer):
     bh = serializers.SerializerMethodField()
     stamp_type = serializers.CharField()
@@ -71,17 +77,19 @@ class BHDSerializer(serializers.Serializer):
 
     def get_stamping_date(self, obj):
 
-        if obj.stamp_type == "digistamp":
+        if obj.stamp_type in ["digistamp","register"]:
             return obj.stamping_date.strftime("%Y-%m-%d %H:%M:%S")
 
-        elif obj.stamp_type == "register":
-            return obj.stamping_date.strftime("%Y-%m-%d") 
-
-    
     def get_bh(self,obj):
         serializer = BHPointSerializer(obj.bh)
         return serializer.data
-    
+
+
+class BHSzakasz_Dev_Serializer(serializers.Serializer):
+    ver_id = serializers.SerializerMethodField()
+
+    def get_ver_id(self,obj):
+        return obj.bh_szakasz.ver_id
 
 class BHSzDSerializer(serializers.Serializer):
     bh_szakasz = serializers.SerializerMethodField()
@@ -89,11 +97,9 @@ class BHSzDSerializer(serializers.Serializer):
     stamping_date = serializers.SerializerMethodField()
 
     def get_stamping_date(self, obj):
-        if obj.stamp_type.value == "digistamp":
-            return obj.stamping_date.strftime("%Y-%m-%d %H:%M:%S")
 
-        elif obj.stamp_type.value == "register":
-            return obj.stamping_date.strftime("%Y-%m-%d") 
+        if obj.stamp_type.value in ["digistamp","register"]:
+            return obj.stamping_date.strftime("%Y-%m-%d %H:%M:%S")
 
 
     def get_stamp_type(self,obj):

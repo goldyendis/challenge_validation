@@ -6,13 +6,15 @@ from typing import List
 import matplotlib
 import heapq
 from challenges.enums import DirectionType, StampType
+
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import networkx as nx
 from challenges.models import BHD, BHSzD, BHSzakasz, CustomNagyszakasz
 
 class NodeGraph:
-    def __init__(self, kezdopont: str, vegpont: str, bhszd_sections: List[BHSzD],mozgalom:str):
+    def __init__(self, kezdopont: str, vegpont: str, bhszd_sections: List[BHSzD],mozgalom:str,testing):
+        self.testing = testing
         self.kezdopont = kezdopont
         self.vegpont = vegpont
         self.mozgalom = mozgalom
@@ -30,7 +32,8 @@ class NodeGraph:
 
     def _create_graph(self):
         self.bhszd_graph = self._build_graph(self.bhszd_sections)
-        self.bhszd_graph_image=self._create_graph_image(self.bhszd_graph)
+        if self.testing:
+            self.bhszd_graph_image=self._create_graph_image(self.bhszd_graph)
 
     
     def _create_graph_image(self,graph):
@@ -67,7 +70,8 @@ class NodeGraph:
         self.validated_graph= nx.MultiDiGraph()
         for bhszd in self.best_path:
             self.validated_graph.add_edge(bhszd.bh_szakasz.kezdopont_bh_id,bhszd.bh_szakasz.vegpont_bh_id,BHSzD=bhszd)
-        self.validated_graph_image = self._create_graph_image(self.validated_graph)
+        if self.testing:
+            self.validated_graph_image = self._create_graph_image(self.validated_graph)
         self._group_bhszd_by_nagyszakasz()
 
 
@@ -135,102 +139,70 @@ class NodeGraph:
         return None
 
 
-    def sort_bhszd_key(self, bhszd):
-        """Sorting key to handle numeric ordering and suffixes for both kezdopont_bh_id and vegpont_bh_id."""
-        def extract_parts(bh_id):
-            match = re.match(r"OKTPH_(\d+)(?:_([A-Za-z0-9_]+))?", bh_id)
-            if match:
-                number = int(match.group(1))
-                suffix = match.group(2) or ""
-                suffix_priority = 0 if suffix == "" else 1
-                return (number, suffix_priority, suffix)
-            else:
-                return (float('inf'), 0, "")
-        
-        kezdopont_key = extract_parts(bhszd.bh_szakasz.kezdopont_bh_id)
-        vegpont_key = extract_parts(bhszd.bh_szakasz.vegpont_bh_id)
-        
+    def extract_parts(self,bh_id: str) -> int:
+        """Extract relevant parts based on mozgalom."""
+        mozgalom_type = self.mozgalom
+        if self.mozgalom == "RPDDK":
+            mozgalom_type = "DDK"
+        # Match all relevant prefixes and their associated numbers
+        matches = re.findall(r"(AKPH|DDKPH|OKTPH)_(\d+)", bh_id)
+        if matches:
+            # Convert to a dictionary for easy lookup
+            prefix_dict = {prefix: int(number) for prefix, number in matches}
+            # Get the number associated with the current mozgalom
+            return prefix_dict.get(f"{mozgalom_type}PH", float('inf'))
+        return float('inf')  # If no matches, sort to the end
+
+    def sort_bhszd_key(self,bhszd):
+        """Sorting key to handle numeric ordering based on the relevant prefix for the current mozgalom."""
+        kezdopont_key = self.extract_parts(bhszd.bh_szakasz.kezdopont_bh_id, self.mozgalom)
+        vegpont_key = self.extract_parts(bhszd.bh_szakasz.vegpont_bh_id, self.mozgalom)
         return (kezdopont_key, vegpont_key)
 
     def _build_graph(self, bhszd_sections) -> nx.MultiDiGraph:
-        """Creates and populates the directed graph dynamically as we reach new nodes."""
+        """
+        Creates and populates the directed graph dynamically by updating the cached graph
+        and adding new, validated BHSzD sections.
+        """
+        # Retrieve cached graph for the current 'mozgalom'
+        from challenges.task import get_graph_cache
+        cached_graph: nx.MultiDiGraph = get_graph_cache(self.mozgalom)
+
+        # Create a new graph to work with
         graph = nx.MultiDiGraph()
+        if cached_graph:
+            graph = cached_graph.copy()
         
-        sorted_bhszd_sections:List[BHSzD] = sorted(bhszd_sections, key=self.sort_bhszd_key)
-        bhszd_edges = {}
-        for bhszd in sorted_bhszd_sections:
+        cached_nodes = set(graph.nodes)
+
+        for bhszd in bhszd_sections:
             start = bhszd.bh_szakasz.kezdopont_bh_id
-            if start in bhszd_edges:
-                bhszd_edges[start].append(bhszd)
-            else:
-                bhszd_edges[start] = [bhszd]
-        visited_nodes = set() 
-        farthest_node = self.kezdopont
-        edges_for_graph:List[BHSzD] = []
-
-        while farthest_node != self.vegpont:
-            if farthest_node not in visited_nodes:
-                visited_nodes.add(farthest_node)
-                if farthest_node in bhszd_edges:
-                    for bhszd in bhszd_edges[farthest_node]:
-                        start, end = bhszd.bh_szakasz.kezdopont_bh_id, bhszd.bh_szakasz.vegpont_bh_id
-                        edges_for_graph.append(bhszd)
-                    if bhszd.bh_szakasz.vegpont != "Visegrád":
-                        bhszd_edges.pop(farthest_node)
-                        farthest_node = end
-                    else:
-                        number = int(end.split("_")[1])
-                        bhszd_edges.pop(farthest_node)
-                        new_id = f"OKTPH_{number+1}"
-                        visegrad_nagymaros_komp = BHSzD(
-                            BHSzakasz.create_null_szakasz(end,new_id),
-                            mozgalom=self.mozgalom,
-                            stamp_type=StampType.DB,
-                            validation_time=self.current_time,
-                            kezdopont=BHD.create_bhd_from_bh_id(end),
-                            vegpont=BHD.create_bhd_from_bh_id(new_id),
-                            )
-                        edges_for_graph.append(visegrad_nagymaros_komp)
-                        farthest_node = new_id
-                
-                else:
-                    bhszakasz = BHSzakasz.get_actual_version_from_DB(farthest_node, self.mozgalom)
-                    if bhszakasz:
-                        start, end = bhszakasz.kezdopont_bh_id, bhszakasz.vegpont_bh_id
-                        edges_for_graph.append(BHSzD(
-                            bhszakasz,mozgalom=self.mozgalom,validation_time=self.current_time,stamp_type=StampType.DB,
-                            kezdopont=BHD.create_bhd_from_bh_id(bhszakasz.kezdopont_bh_id),
-                            vegpont=BHD.create_bhd_from_bh_id(bhszakasz.vegpont_bh_id),
-                            direction=DirectionType.Unknown
-                            ))
-                        if bhszakasz.vegpont != "Visegrád":
-                            farthest_node = end
-                        else:
-                            number = int(end.split("_")[1])
-                            new_id = f"OKTPH_{number+1}"
-                            visegrad_nagymaros_komp = BHSzD(
-                                BHSzakasz.create_null_szakasz(end,new_id),
-                                mozgalom=self.mozgalom,
-                                stamp_type=StampType.DB,
-                                validation_time=self.current_time,
-                                kezdopont=BHD.create_bhd_from_bh_id(end),
-                                vegpont=BHD.create_bhd_from_bh_id(new_id),
-                                )
-                            edges_for_graph.append(visegrad_nagymaros_komp)
-                            farthest_node = new_id
-
-        if len(bhszd_edges.keys())>0:
-            for stamp,_ in bhszd_edges.items():
-                for bhszd in bhszd_edges[stamp]:
-                    start, end = bhszd.bh_szakasz.kezdopont_bh_id, bhszd.bh_szakasz.vegpont_bh_id
-                    edges_for_graph.append(bhszd)
-
-        sorted_edges_for_graph=sorted(edges_for_graph, key=self.sort_bhszd_key)
-
-        for bhszd in sorted_edges_for_graph:
+            end = bhszd.bh_szakasz.vegpont_bh_id
             edge_weight = int(self._custom_edge_weight(bhszd))
-            graph.add_edge(bhszd.bh_szakasz.kezdopont_bh_id,bhszd.bh_szakasz.vegpont_bh_id,BHSzD=bhszd, weight=edge_weight)
+
+            # Remove existing edges between these nodes to replace them with validated BHSzD
+            edges_to_remove = [
+                (u, v, key) for u, v, key, data in graph.edges(keys=True, data=True)
+                if u == start and v == end and data["BHSzD"].stamp_type == StampType.DB
+            ]
+            if edges_to_remove:
+                graph.remove_edges_from(edges_to_remove)
+
+            # Add missing nodes
+            if start not in cached_nodes:
+                graph.add_node(start)
+                cached_nodes.add(start)
+            if end not in cached_nodes:
+                graph.add_node(end)
+                cached_nodes.add(end)
+
+            # Add the new validated edge
+            graph.add_edge(start, end, BHSzD=bhszd, weight=edge_weight)
+
         return graph
+
+
+
 
 
 
@@ -297,7 +269,7 @@ class NodeGraph:
 
     def _draw_graph(self, graph: nx.MultiDiGraph, pos: dict, edge_colors: list, edge_labels: dict) -> str:
         """Draws the graph and returns it as a base64-encoded image."""
-        plt.figure(figsize=(22, 22), dpi=200)
+        plt.figure(figsize=(22, 22), dpi=100)
         
         labels = {node: '_\n'.join(node.split('_', 1)) if '_' in node else node for node in graph.nodes}
         nx.draw_networkx_nodes(graph, pos, node_size=300, node_color="lightblue")

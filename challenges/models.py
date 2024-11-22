@@ -25,36 +25,37 @@ class BHDList(list):
 class BH(models.Model):
     objectid = models.AutoField(primary_key=True)
     sorszam = models.SmallIntegerField(null=True, blank=True)
+    ver_id = models.IntegerField(null=True, blank=False)
     mtsz_id = models.CharField(max_length=30, null=True, blank=True)
     bh_id = models.CharField(max_length=30, null=True, blank=True)
     bh_nev = models.CharField(max_length=120, null=True, blank=True)
     helyszin = models.CharField(max_length=100, null=True, blank=True)
-    helyszin_leiras = models.CharField(max_length=255, null=True, blank=True)
-    cim = models.CharField(max_length=50, null=True, blank=True)
-    elerhetoseg = models.CharField(max_length=40, null=True, blank=True)
-    nyitvatartas = models.CharField(max_length=255, null=True, blank=True)
+    # helyszin_leiras = models.CharField(max_length=255, null=True, blank=True)
+    # cim = models.CharField(max_length=50, null=True, blank=True)
+    # elerhetoseg = models.CharField(max_length=40, null=True, blank=True)
+    # nyitvatartas = models.CharField(max_length=255, null=True, blank=True)
     lat = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
     lon = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
-    lenyomat = models.CharField(max_length=100, null=True, blank=True)
-    url_lenyomat = models.CharField(max_length=150, null=True, blank=True)
-    url_kep_1 = models.CharField(max_length=150, null=True, blank=True)
-    url_kep_2 = models.CharField(max_length=150, null=True, blank=True)
-    url_kep_3 = models.CharField(max_length=150, null=True, blank=True)
-    url_kep_4 = models.CharField(max_length=150, null=True, blank=True)
-    url_kep_5 = models.CharField(max_length=150, null=True, blank=True)
-    helyszin_eng = models.CharField(max_length=100, null=True, blank=True)
-    helyszin_leiras_eng = models.CharField(max_length=255, null=True, blank=True)
-    elerhetoseg_eng = models.CharField(max_length=40, null=True, blank=True)
-    nyitvatartas_eng = models.CharField(max_length=255, null=True, blank=True)
+    # lenyomat = models.CharField(max_length=100, null=True, blank=True)
+    # url_lenyomat = models.CharField(max_length=150, null=True, blank=True)
+    # url_kep_1 = models.CharField(max_length=150, null=True, blank=True)
+    # url_kep_2 = models.CharField(max_length=150, null=True, blank=True)
+    # url_kep_3 = models.CharField(max_length=150, null=True, blank=True)
+    # url_kep_4 = models.CharField(max_length=150, null=True, blank=True)
+    # url_kep_5 = models.CharField(max_length=150, null=True, blank=True)
+    # helyszin_eng = models.CharField(max_length=100, null=True, blank=True)
+    # helyszin_leiras_eng = models.CharField(max_length=255, null=True, blank=True)
+    # elerhetoseg_eng = models.CharField(max_length=40, null=True, blank=True)
+    # nyitvatartas_eng = models.CharField(max_length=255, null=True, blank=True)
 
     start_date = models.DateTimeField(null=True, blank=True)
     end_date = models.DateTimeField(null=True, blank=True)
-    created_date = models.DateTimeField(null=True, blank=True)
-    last_edited_date = models.DateTimeField(null=True, blank=True)
+    # created_date = models.DateTimeField(null=True, blank=True)
+    # last_edited_date = models.DateTimeField(null=True, blank=True)
 
-    created_user = models.CharField(max_length=255, null=True, blank=True)
-    last_edited_user = models.CharField(max_length=255, null=True, blank=True)
-    shape = models.TextField(null=True, blank=True)  
+    # created_user = models.CharField(max_length=255, null=True, blank=True)
+    # last_edited_user = models.CharField(max_length=255, null=True, blank=True)
+    # shape = models.TextField(null=True, blank=True)  
 
     class Meta:
         db_table = 'bhpont'
@@ -91,23 +92,39 @@ class BH(models.Model):
         ).first()
 
     @staticmethod
-    def create_BH_from_request(json_stamp:dict,timestamp: datetime):
+    def create_BH_from_request(json_stamp:dict,bh_cache:dict,timestamp: datetime):
         '''
         With the POST request data, get the BH from the DB.
         Database versioning starts from 2000-01-01, so converting lower date up to that'''
         if timestamp < datetime(2000, 1, 1):
             timestamp = datetime(2000, 1, 1)
-        try:
-            bh:BH = BH.objects.get(
-                Q(mtsz_id=json_stamp.get('stampPointId')),
-                Q(start_date__lte=timestamp),
-                Q(end_date__gte=timestamp) | Q(end_date__isnull=True)
-            )
-            return bh
-        except BH.DoesNotExist:
-            print(exceptions.ValidationError(f"No BHPoint found for mtsz_id {json_stamp.get('stampPointId')} at {timestamp}"))
+
+        bh_match = next(
+        (
+            bh for bh in bh_cache
+            if bh['mtsz_id'] == json_stamp.get('stampPointId')
+            and bh['start_date'] <= timestamp
+            and (bh['end_date'] is None or bh['end_date'] >= timestamp)
+        ),
+        None
+    )
+
+        if bh_match:
+            return BH(**bh_match)  # Rehydrate the BH object from the cache data
+
+        else:
+            try:
+                bh:BH = BH.objects.get(
+                    Q(mtsz_id=json_stamp.get('stampPointId')),
+                    Q(start_date__lte=timestamp),
+                    Q(end_date__gte=timestamp) | Q(end_date__isnull=True)
+                )
+                return bh
+            except BH.DoesNotExist:
+                print(exceptions.ValidationError(f"No BHPoint found for mtsz_id {json_stamp.get('stampPointId')} at {timestamp}"))
+    
     def __str__(self):
-        return f"{self.objectid}: {self.bh_nev} s_date:{self.start_date}, e_date: {self.end_date}, {self.mtsz_id}, {self.bh_id}"
+        return f"{self.objectid}: {self.ver_id} {self.bh_nev} s_date:{self.start_date}, e_date: {self.end_date}, {self.mtsz_id}, {self.bh_id}"
 
 
 class NagySzakasz(models.Model):
@@ -140,6 +157,7 @@ class NagySzakasz(models.Model):
 class BHSzakasz(models.Model):
     objectid = models.AutoField(primary_key=True)
     sorszam = models.SmallIntegerField(null=True, blank=True)
+    ver_id = models.IntegerField(null=True, blank=False)
     nagyszakasz_id = models.CharField(max_length=30, null=True, blank=True)
     bhszakasz_id = models.CharField(max_length=30, null=True, blank=True)
     kezdopont = models.CharField(max_length=60, null=True, blank=True)
@@ -154,13 +172,13 @@ class BHSzakasz(models.Model):
     okk_mozgalom = models.CharField(max_length=10, null=True, blank=True)
     start_date = models.DateTimeField(null=True, blank=True)
     end_date = models.DateTimeField(null=True, blank=True)
-    created_date = models.DateTimeField(null=True, blank=True)
-    last_edited_date = models.DateTimeField(null=True, blank=True)
-    created_user = models.CharField(max_length=255, null=True, blank=True)
-    last_edited_user = models.CharField(max_length=255, null=True, blank=True)
+    # created_date = models.DateTimeField(null=True, blank=True)
+    # last_edited_date = models.DateTimeField(null=True, blank=True)
+    # created_user = models.CharField(max_length=255, null=True, blank=True)
+    # last_edited_user = models.CharField(max_length=255, null=True, blank=True)
     kezdopont_bh_id = models.CharField(max_length=10, null=True, blank=True)
     vegpont_bh_id = models.CharField(max_length=10, null=True, blank=True)
-    shape = models.TextField(null=True, blank=True)  
+    # shape = models.TextField(null=True, blank=True)  
 
 
     class Meta:
@@ -192,7 +210,7 @@ class BHSzakasz(models.Model):
 
 
     def __str__(self):
-        return f"{self.objectid}: {self.bhszakasz_id}, {self.szakasznev},{self.kezdopont_bh_id},{self.vegpont_bh_id} at s_date:{self.start_date}, e_date: {self.end_date}"
+        return f"{self.objectid}:{self.ver_id} {self.bhszakasz_id}, {self.szakasznev},{self.kezdopont_bh_id}/{self.kezdopont},{self.vegpont_bh_id}/{self.vegpont} at s_date:{self.start_date}, e_date: {self.end_date}"
     
 
 
@@ -255,7 +273,8 @@ class BHD:
     @staticmethod
     def create_bhd_from_bh(bh:BH,timestamp: datetime, stamp_type: StampType):
         '''DB BH model, with other request data converting into BHD'''
-        time = timestamp if stamp_type == "digistamp" else timestamp.replace(hour=0,minute=0,second=0,microsecond=0)
+        # time = timestamp if stamp_type == "digistamp" else timestamp.replace(hour=0,minute=0,second=0,microsecond=0)
+        time = timestamp 
         bhd = BHD(
             bh=bh,
             timestamp=time,
@@ -264,12 +283,25 @@ class BHD:
         return bhd
 
     @staticmethod
-    def create_bhd_from_bh_id(bh_id:str):
-        bh:BH = BH.get_actual_BH_from_bh_id(bh_id)
-        return BHD(bh,timestamp=None,stamp_type=StampType.DB)
+    def create_bhd_from_bh_id(bh_id:str, bh_cache:dict=None):
+        if bh_cache:
+            bh_match = next(
+            (
+                bh for bh in bh_cache
+                if bh['bh_id'] == bh_id
+                and bh['end_date'] is None)
+            )
+
+            if bh_match:
+                return BHD(bh=BH(**bh_match),timestamp=None,stamp_type=StampType.DB)  
+
+        else:
+
+            bh:BH = BH.get_actual_BH_from_bh_id(bh_id)
+            return BHD(bh,timestamp=None,stamp_type=StampType.DB)
 
     def __repr__(self) -> str:
-        return (f"BHD with ID:{self.bh.bh_id}, MTSZ_ID: {self.bh.mtsz_id}, NEV: {self.bh.bh_nev}, Time: {self.stamping_date}, Type: {self.stamp_type}")
+        return (f"BHD with ID:{self.bh.bh_id}, {self.bh.ver_id} MTSZ_ID: {self.bh.mtsz_id}, NEV: {self.bh.bh_nev}, Time: {self.stamping_date}, Type: {self.stamp_type}")
 
 class BHSzD:
     def __init__(self, bh_szakasz:BHSzakasz, validation_time:datetime=None, stamp_type: StampType=None, mozgalom: BookletTypes=None,kezdopont:BHD=None, vegpont:BHD=None, direction:DirectionType=DirectionType.Unknown,speed=None ) -> None:
@@ -289,7 +321,7 @@ class BHSzD:
         return None
 
     def __repr__(self) -> str:
-        return f"BHSzD with ID:{self.bh_szakasz.bhszakasz_id}, KezdoBH: {self.kezdopont.bh.bh_id} at {self.kezdopont.stamping_date}, VEGBH: {self.vegpont.bh.bh_id} at {self.vegpont.stamping_date}, Time: {self.stamping_date}, {self.stamp_type}, {self.mozgalom}, {self.direction}, {self.speed}km/h, {self.time} minutes"
+        return f"BHSzD with ID:{self.bh_szakasz.bhszakasz_id},{self.bh_szakasz.ver_id} Szakasz: {self.bh_szakasz} KezdoBH: {self.kezdopont.bh.bh_id} at {self.kezdopont.stamping_date}, VEGBH: {self.vegpont.bh.bh_id} at {self.vegpont.stamping_date}, Time: {self.stamping_date}, {self.stamp_type}, {self.mozgalom}, {self.direction}, {self.speed}km/h, {self.time} minutes"
 
 class CustomNagyszakasz(NagySzakasz):
     def __init__(self, bhszds:List[BHSzD],id:str,*args, **kwargs):

@@ -198,7 +198,6 @@ class NodeGraph:
 
             # Add the new validated edge
             graph.add_edge(start, end, BHSzD=bhszd, weight=edge_weight)
-
         return graph
 
 

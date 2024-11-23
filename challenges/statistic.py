@@ -24,18 +24,22 @@ class Statistic:
     time_on_blue:Dict[str, int] = field(default_factory=dict)
     since_first_stamp_time_diff: Dict[str, int] = field(default_factory=dict)
     excepted_completion: Dict[str, int] = field(default_factory=dict)
+    gykt_tajegyseg_data:Dict[str,int] = field(default_factory=dict)
 
     
 
 
 
 class KekturaStatistics:
-    def __init__(self, validated_bhd:BHDList[BHD],validated_bhszd:List[BHSzD], best_path:List[BHSzD], completed_nagyszakasz:int, all_nagyszakasz:int):
+    def __init__(self, validated_bhd:BHDList[BHD],validated_bhszd:List[BHSzD], best_path:List[BHSzD], completed_nagyszakasz:int, all_nagyszakasz:int, birth_year:int,gykt_already:int, mozgalom:str):
         self.validated_bhd = validated_bhd
         self.valid_bhszds = validated_bhszd
         self.best_path = best_path
         self.completed_main_section = completed_nagyszakasz
         self.all_main_section = all_nagyszakasz
+        self.birth_year = birth_year
+        self.gykt_already = gykt_already
+        self.mozgalom = mozgalom
         self.statistic_data = Statistic()
         self.statistic_data.completed_main_sections = self.completed_main_section
         self.statistic_data.all_main_sections = self.all_main_section
@@ -60,7 +64,6 @@ class KekturaStatistics:
             
             if path.stamp_type==StampType.DB:
                 self.statistic_data.remaining_length +=length
-                self.statistic_data.mozgalom_completed = False
             else:
                 self.statistic_data.completed_length += length
                 completed_elevation+=elevation
@@ -82,6 +85,20 @@ class KekturaStatistics:
         self._calculate_length_statistic()
         self._calculate_elevation_statistic(all_elevation,completed_elevation)
         self._calculate_date_datas(start_date,valid_bhszd_time,end_date)
+        self.statistic_data.mozgalom_completed = int(self.statistic_data.remaining_length) == 0
+
+        if not self.gykt_already and self.mozgalom == "OKT":
+            gykt_start_interval = self.birth_year+6
+            gykt_end_interval = self.birth_year+14
+            bhszd_sections_in_interval:List[BHSzD] = [bhszd for bhszd in self.valid_bhszds if gykt_start_interval <= bhszd.stamping_date.year <= gykt_end_interval]
+            self.statistic_data.gykt_tajegyseg_data["mozgalom"] = 0
+            for bhszd in bhszd_sections_in_interval:
+                if self.statistic_data.gykt_tajegyseg_data.get(bhszd.bh_szakasz.gykt_tajegyseg,None):
+                    self.statistic_data.gykt_tajegyseg_data[bhszd.bh_szakasz.gykt_tajegyseg] += bhszd.bh_szakasz.tav
+                    self.statistic_data.gykt_tajegyseg_data["mozgalom"] += bhszd.bh_szakasz.tav
+                else:
+                    self.statistic_data.gykt_tajegyseg_data[bhszd.bh_szakasz.gykt_tajegyseg] = bhszd.bh_szakasz.tav
+                    self.statistic_data.gykt_tajegyseg_data["mozgalom"] += bhszd.bh_szakasz.tav
 
     def _calculate_date_datas(self,start_date:datetime, time_on_blue,end_date):
         time_diff = relativedelta(datetime.now(), start_date) if not self.statistic_data.mozgalom_completed else relativedelta(end_date,start_date)

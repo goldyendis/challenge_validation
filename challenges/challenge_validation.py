@@ -15,6 +15,8 @@ class ChallengeValidation:
         self.testing = testing
         self.validated_bhszd:List[BHSzD] = []
         self.mozgalom: BookletTypes = request.data.get('bookletWhichBlue',None)
+        self.birth_year: int = int(request.data.get('birth_year',None))
+        self.gykt_already: bool = True if request.data.get('gykt_done',None) == "true" else False
         self.BHD_list:BHDList[BHD] = self.create_BHD_objects(request)
         self.kezdopont, self.vegpont = BH.get_mozgalom_start_end_BH(self.BHD_list, self.mozgalom)
         self.sort_BHDs()
@@ -26,7 +28,10 @@ class ChallengeValidation:
             validated_bhszd=self.validated_bhszd,
             best_path=self.nodeGraph.best_path, 
             completed_nagyszakasz=self.nodeGraph.completed_nagyszakasz, 
-            all_nagyszakasz = self.nodeGraph.all_nagyszakasz)
+            all_nagyszakasz = self.nodeGraph.all_nagyszakasz,
+            birth_year=self.birth_year,
+            gykt_already = self.gykt_already,
+            mozgalom = self.mozgalom)
         
 
     def create_BHD_objects(self, request)->BHDList[BHD]:

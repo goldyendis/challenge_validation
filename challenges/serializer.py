@@ -66,6 +66,10 @@ class TuramozgalomSerializer(serializers.ModelSerializer):
 
 class BH_Dev_Serializer(serializers.Serializer):
     ver_id = serializers.SerializerMethodField()
+    stamping_date = serializers.SerializerMethodField()
+
+    def get_stamping_date(self,obj):
+        return obj.stamping_date
 
     def get_ver_id(self,obj):
         return obj.bh.ver_id
@@ -87,6 +91,10 @@ class BHDSerializer(serializers.Serializer):
 
 class BHSzakasz_Dev_Serializer(serializers.Serializer):
     ver_id = serializers.SerializerMethodField()
+    stamping_date = serializers.SerializerMethodField()
+
+    def get_stamping_date(self,obj):
+        return obj.stamping_date
 
     def get_ver_id(self,obj):
         return obj.bh_szakasz.ver_id
@@ -110,6 +118,16 @@ class BHSzDSerializer(serializers.Serializer):
         return serializer.data
     
 
+class GYKTSerializer(serializers.Serializer):
+    name = serializers.CharField()
+    completed = serializers.SerializerMethodField()
+    length = serializers.DecimalField(max_digits=12, decimal_places=8)
+
+    def get_completed(self, obj):
+        if obj['name'] == 'mozgalom':
+            return obj['length'] >= 300
+        return obj['length'] >= 50
+
 class StatisticSerializer(serializers.Serializer):
     mozgalom_completed = serializers.BooleanField()
     all_length = serializers.SerializerMethodField()
@@ -127,6 +145,7 @@ class StatisticSerializer(serializers.Serializer):
     time_on_blue = serializers.DictField()
     since_first_stamp_time_diff = serializers.DictField()
     excepted_completion = serializers.DictField()
+    gykt_tajegyseg_data = serializers.SerializerMethodField()
 
     def _round_decimal(self, value):
         return float(Decimal(value).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP))
@@ -148,3 +167,11 @@ class StatisticSerializer(serializers.Serializer):
 
     def get_average_speed(self, obj):
         return self._round_decimal(obj.average_speed)
+    
+    def get_gykt_tajegyseg_data(self, obj):
+        # Assuming `gykt_data` contains the raw data for serialization
+        raw_data = obj.gykt_tajegyseg_data  # This should be a dictionary
+        serializer = GYKTSerializer([
+            {'name': key, 'length': value} for key, value in raw_data.items()
+        ], many=True)
+        return serializer.data
